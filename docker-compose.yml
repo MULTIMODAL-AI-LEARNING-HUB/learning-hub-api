@@ -71,10 +71,10 @@ services:
     volumes:
       - qdrant_storage:/qdrant/storage
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:6333/health"]
-      interval: 30s
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333"]
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 10
     networks:
       - hub-network
     deploy:

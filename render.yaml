@@ -18,7 +18,8 @@ services:
       - key: DATABASE_URL
         sync: false # Bạn sẽ điền chuỗi kết nối Supabase lúc deploy
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: learning-hub-uat-redis
           property: connectionString
       - key: AI_SERVICE_URL
@@ -36,7 +37,8 @@ services:
       - key: PORT
         value: 8001
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: learning-hub-uat-redis
           property: connectionString
       - key: GEMINI_API_KEY
@@ -56,11 +58,13 @@ services:
       - key: DATABASE_URL
         sync: false # Điền chuỗi kết nối Supabase lúc deploy
       - key: CELERY_BROKER_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: learning-hub-uat-redis
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: learning-hub-uat-redis
           property: connectionString
       - key: MINIO_ENDPOINT

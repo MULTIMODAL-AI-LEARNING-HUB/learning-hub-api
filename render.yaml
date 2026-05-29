@@ -1,0 +1,73 @@
+services:
+  # 1. Dịch vụ Redis (Hàng đợi tin nhắn & Caching)
+  - type: redis
+    name: learning-hub-uat-redis
+    plan: free
+    ipAllowList: [] # Cho phép kết nối an toàn nội bộ
+
+  # 2. FastAPI Gateway (Web Service chính public ra Internet)
+  - type: web
+    name: learning-hub-api
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false # Bạn sẽ điền chuỗi kết nối Supabase lúc deploy
+      - key: REDIS_URL
+        fromRedis:
+          name: learning-hub-uat-redis
+          property: connectionString
+      - key: AI_SERVICE_URL
+        value: http://learning-hub-ai:8001
+
+  # 3. AI Service (Private Service - Chỉ gọi nội bộ từ API Gateway)
+  - type: pserv
+    name: learning-hub-ai
+    repo: https://github.com/MULTIMODAL-AI-LEARNING-HUB/learning-hub-ai
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PORT
+        value: 8001
+      - key: REDIS_URL
+        fromRedis:
+          name: learning-hub-uat-redis
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false # Điền API Key của Gemini lúc deploy
+      - key: GROQ_API_KEY
+        sync: false # Điền API Key của Groq lúc deploy
+
+  # 4. Celery Worker (Background Worker xử lý file nặng chạy ngầm)
+  - type: worker
+    name: learning-hub-worker
+    repo: https://github.com/MULTIMODAL-AI-LEARNING-HUB/learning-hub-worker
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Điền chuỗi kết nối Supabase lúc deploy
+      - key: CELERY_BROKER_URL
+        fromRedis:
+          name: learning-hub-uat-redis
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: learning-hub-uat-redis
+          property: connectionString
+      - key: MINIO_ENDPOINT
+        sync: false # Điền URL của Cloudflare R2 lúc deploy
+      - key: MINIO_ACCESS_KEY
+        sync: false # Điền Access Key của R2 lúc deploy
+      - key: MINIO_SECRET_KEY
+        sync: false # Điền Secret Key của R2 lúc deploy
+      - key: MINIO_BUCKET_NAME
+        value: learning-hub-uat-storage

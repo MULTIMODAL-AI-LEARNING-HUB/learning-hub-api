@@ -1,9 +1,14 @@
 from uuid import UUID, uuid4
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.document import Document
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"

@@ -1,8 +1,16 @@
 from uuid import UUID, uuid4
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.document import Document
+    from app.models.chat import ChatSession
+    from app.models.flashcard import Flashcard
+    from app.models.essay import EssaySubmission
+    from app.models.quota import Quota
 
 class User(Base):
     __tablename__ = "users"

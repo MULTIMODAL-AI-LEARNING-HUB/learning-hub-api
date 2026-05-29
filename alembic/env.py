@@ -14,7 +14,7 @@ from os.path import abspath, dirname
 sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
 from app.core.database import Base
-from app.models import (
+from app.models import (  # noqa: F401
     User, Document, ChatSession, ChatMessage, Flashcard, FlashcardItem, EssaySubmission, Quota
 )
 from app.core.config import settings

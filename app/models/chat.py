@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     document_id: Mapped[UUID | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), index=True)
@@ -27,7 +27,7 @@ class ChatSession(Base):
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     session_id: Mapped[UUID] = mapped_column(ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False)

@@ -10,6 +10,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - QDRANT_HOST=qdrant
       - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379/0
+      - AI_SERVICE_URL=http://ai:8001
       - MINIO_ENDPOINT=http://minio:9000
     depends_on:
       db:

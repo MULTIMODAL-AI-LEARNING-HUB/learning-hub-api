@@ -14,12 +14,13 @@ if TYPE_CHECKING:
 
 class Document(Base):
     __tablename__ = "documents"
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(50), nullable=False)
     file_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    storage_key: Mapped[str | None] = mapped_column(String(500))
     file_size: Mapped[int | None] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(50), default="pending")
     file_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB)

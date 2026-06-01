@@ -10,7 +10,7 @@ async def init_db() -> None:
         # Check if admin user already exists
         result = await session.execute(select(User).filter_by(email="admin@learninghub.com"))
         admin_user = result.scalars().first()
-        
+
         if not admin_user:
             print("Seeding default administrator...")
             admin_user = User(
@@ -22,7 +22,7 @@ async def init_db() -> None:
             )
             session.add(admin_user)
             await session.flush()  # Obtain the admin_user.id
-            
+
             # Check if quota exists for this user
             quota = Quota(
                 user_id=admin_user.id,

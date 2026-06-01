@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 class Flashcard(Base):
     __tablename__ = "flashcards"
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     document_id: Mapped[UUID | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), index=True)
@@ -25,7 +25,7 @@ class Flashcard(Base):
 
 class FlashcardItem(Base):
     __tablename__ = "flashcard_items"
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     flashcard_id: Mapped[UUID] = mapped_column(ForeignKey("flashcards.id", ondelete="CASCADE"), nullable=False, index=True)
     front_text: Mapped[str] = mapped_column(Text, nullable=False)

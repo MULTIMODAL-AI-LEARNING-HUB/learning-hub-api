@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class Quota(Base):
     __tablename__ = "quotas"
-    
+
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     storage_limit_mb: Mapped[int] = mapped_column(BigInteger, default=1024)

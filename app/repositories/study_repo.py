@@ -18,12 +18,15 @@ class StudyRepository(BaseRepository):
     async def add_flashcard_items(self, items: list[FlashcardItem]) -> list[FlashcardItem]:
         self.db.add_all(items)
         await self.db.commit()
-        for item in items:
-            await self.db.refresh(item)
         return items
 
     async def get_flashcard(self, flashcard_id: UUID) -> Flashcard | None:
-        result = await self.db.execute(select(Flashcard).where(Flashcard.id == flashcard_id))
+        from sqlalchemy.orm import selectinload
+        result = await self.db.execute(
+            select(Flashcard)
+            .where(Flashcard.id == flashcard_id)
+            .options(selectinload(Flashcard.items))
+        )
         return result.scalar_one_or_none()
 
     async def create_essay_submission(self, submission: EssaySubmission) -> EssaySubmission:

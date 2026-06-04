@@ -22,3 +22,17 @@ class UserRepository(BaseRepository):
         await self.db.commit()
         await self.db.refresh(user)
         return user
+
+    async def count_all(self) -> int:
+        from sqlalchemy import func
+        result = await self.db.execute(select(func.count(User.id)))
+        return result.scalar() or 0
+
+    async def list_all(self, offset: int, limit: int) -> list[User]:
+        result = await self.db.execute(
+            select(User)
+            .order_by(User.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().all())

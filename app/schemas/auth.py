@@ -25,6 +25,15 @@ class TokenResponse(BaseModel):
     refresh_token: str | None = None
 
 
+class QuotaResponse(BaseModel):
+    storage_limit_mb: int
+    storage_used_mb: float
+    video_limit: int
+    video_used: int
+    token_limit: int
+    token_used: int
+
+
 class AuthUserResponse(BaseModel):
     id: UUID
     email: EmailStr
@@ -32,6 +41,7 @@ class AuthUserResponse(BaseModel):
     avatar_url: str | None = None
     role: str
     created_at: datetime | None = None
+    quota: QuotaResponse | None = None
 
 
 class AuthResponse(BaseModel):

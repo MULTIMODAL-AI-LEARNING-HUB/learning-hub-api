@@ -18,10 +18,20 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str = "documents-bucket"
     MINIO_SECURE: bool = False
 
-    DB_POOL_SIZE: int = 10
-    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+
+    REDIS_CACHE_TTL_DOCS: int = 60
+    REDIS_CACHE_TTL_PROFILE: int = 300
+    REDIS_CACHE_TTL_QUIZ: int = 3600
+    AI_SERVICE_TIMEOUT: int = 60
+
+    RATE_LIMIT_AUTH: str = "10/minute"
+    RATE_LIMIT_CHAT: str = "30/minute"
+    RATE_LIMIT_UPLOAD: str = "5/minute"
+    RATE_LIMIT_ADMIN: str = "60/minute"
 
     SECRET_KEY: str = "change-me"
     ALGORITHM: str = "HS256"

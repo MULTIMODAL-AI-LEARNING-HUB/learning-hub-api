@@ -21,7 +21,21 @@ class AuthService:
             password_hash=hash_password(password),
             full_name=full_name,
         )
-        return await self.repo.create(user)
+        user = await self.repo.create(user)
+
+        from app.models.quota import Quota
+        quota = Quota(
+            user_id=user.id,
+            storage_limit_mb=1024,
+            storage_used_mb=0,
+            video_limit=5,
+            video_used=0,
+            token_limit=50000,
+            token_used=0
+        )
+        self.repo.db.add(quota)
+        await self.repo.db.commit()
+        return user
 
     async def authenticate(self, email: str, password: str) -> User:
         user = await self.repo.get_by_email(email)

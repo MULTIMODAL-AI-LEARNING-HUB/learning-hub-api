@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
+from sqlalchemy.orm import selectinload
 
 from app.models.chat import ChatMessage, ChatSession
 from app.repositories.base import BaseRepository
@@ -17,6 +18,7 @@ class ChatRepository(BaseRepository):
         result = await self.db.execute(
             select(ChatSession)
             .where(ChatSession.user_id == user_id)
+            .options(selectinload(ChatSession.messages))
             .order_by(ChatSession.updated_at.desc())
             .offset(offset)
             .limit(limit)
@@ -24,8 +26,18 @@ class ChatRepository(BaseRepository):
         return list(result.scalars().all())
 
     async def get_session(self, session_id: UUID) -> ChatSession | None:
-        result = await self.db.execute(select(ChatSession).where(ChatSession.id == session_id))
+        result = await self.db.execute(
+            select(ChatSession)
+            .where(ChatSession.id == session_id)
+            .options(selectinload(ChatSession.messages))
+        )
         return result.scalar_one_or_none()
+
+    async def count_sessions(self, user_id: UUID) -> int:
+        result = await self.db.execute(
+            select(func.count(ChatSession.id)).where(ChatSession.user_id == user_id)
+        )
+        return result.scalar() or 0
 
     async def delete_session(self, session_id: UUID) -> None:
         await self.db.execute(delete(ChatSession).where(ChatSession.id == session_id))
@@ -46,3 +58,9 @@ class ChatRepository(BaseRepository):
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_messages(self, session_id: UUID) -> int:
+        result = await self.db.execute(
+            select(func.count(ChatMessage.id)).where(ChatMessage.session_id == session_id)
+        )
+        return result.scalar() or 0

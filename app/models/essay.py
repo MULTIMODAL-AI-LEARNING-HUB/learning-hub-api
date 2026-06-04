@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from sqlalchemy import Text, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,7 +18,7 @@ class EssaySubmission(Base):
     submission_text: Mapped[str] = mapped_column(Text, nullable=False)
     ai_grade: Mapped[float | None] = mapped_column(Numeric(5, 2))
     ai_feedback: Mapped[str | None] = mapped_column(Text)
-    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="essay_submissions")

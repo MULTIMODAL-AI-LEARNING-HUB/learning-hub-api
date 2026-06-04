@@ -1,6 +1,6 @@
-"""Admin endpoints."""
+"""Admin API endpoints."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -8,23 +8,31 @@ from app.dependencies.auth import require_admin
 from app.dependencies.db import get_db
 from app.models.user import User
 from app.models.document import Document
+from app.repositories.user_repo import UserRepository
+
+# Caching & limiters
+from app.core.limiter import limiter
+from app.core.config import settings
+from app.core.cache import RedisCache, get_redis_client
+from app.clients.ai_client import get_ai_client
 
 router = APIRouter()
 
 
 @router.get("/users")
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_users(
+    request: Request,
     page: int = 1,
     page_size: int = 20,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    """Retrieve all users with pagination, using UserRepository."""
+    repo = UserRepository(db)
     offset = (page - 1) * page_size
-    result = await db.execute(select(User).offset(offset).limit(page_size))
-    users = result.scalars().all()
-
-    total_result = await db.execute(select(func.count(User.id)))
-    total = total_result.scalar()
+    users = await repo.list_all(offset, page_size)
+    total = await repo.count_all()
 
     return {
         "items": [
@@ -45,52 +53,69 @@ async def list_users(
 
 
 @router.get("/analytics")
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def analytics(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    users_count = (await db.execute(select(func.count(User.id)))).scalar()
-    docs_count = (await db.execute(select(func.count(Document.id)))).scalar()
+    """Retrieve aggregate counts and statistics, cached for 60 seconds."""
+    cache = RedisCache()
+    cache_key = "cache:admin:analytics"
+    
+    cached = await cache.get(cache_key)
+    if cached:
+        return cached
+
+    users_count = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    docs_count = (await db.execute(select(func.count(Document.id)))).scalar() or 0
     docs_ready = (
         await db.execute(select(func.count(Document.id)).where(Document.status == "ready"))
-    ).scalar()
+    ).scalar() or 0
     docs_processing = (
         await db.execute(select(func.count(Document.id)).where(Document.status == "processing"))
-    ).scalar()
+    ).scalar() or 0
 
-    return {
+    response_data = {
         "total_users": users_count,
         "total_documents": docs_count,
         "documents_ready": docs_ready,
         "documents_processing": docs_processing,
     }
+    
+    await cache.set(cache_key, response_data, ttl=60)
+    return response_data
 
 
 @router.get("/health")
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def health(
+    request: Request,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
+    """Secure administrative endpoint to ping database, Redis, and AI services asynchronously."""
     services = {}
 
+    # 1. Test Database Connection
     try:
-        await db.execute(select(func.count(User.id)))
+        await db.execute(select(1))
         services["database"] = "healthy"
     except Exception:
         services["database"] = "unhealthy"
 
-    import httpx
-    from app.core.config import settings
-
+    # 2. Test AI Service Connection (Async HTTP)
     try:
-        resp = httpx.get(f"{settings.AI_SERVICE_URL}/health", timeout=5)
+        client = get_ai_client()
+        resp = await client.get("/health", timeout=5)
         services["ai_service"] = "healthy" if resp.status_code == 200 else "unhealthy"
     except Exception:
         services["ai_service"] = "unhealthy"
 
-    import redis as r
+    # 3. Test Redis Connection (Async Redis)
     try:
-        r_client = r.from_url(settings.REDIS_URL)
-        r_client.ping()
+        r_client = get_redis_client()
+        await r_client.ping()
         services["redis"] = "healthy"
     except Exception:
         services["redis"] = "unhealthy"

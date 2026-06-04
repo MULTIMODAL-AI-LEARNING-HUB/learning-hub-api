@@ -1,6 +1,8 @@
+"""Auth API endpoints."""
+
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_user
@@ -11,10 +13,24 @@ from app.core.security import decode_token
 from app.schemas import AuthResponse, AuthUserResponse, LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
 from app.services.auth_service import AuthService
 
+from app.core.limiter import limiter
+from app.core.config import settings
+
 router = APIRouter()
 
 
 def _build_user_response(user: User) -> AuthUserResponse:
+    from app.schemas.auth import QuotaResponse
+    quota_resp = None
+    if user.quota:
+        quota_resp = QuotaResponse(
+            storage_limit_mb=user.quota.storage_limit_mb,
+            storage_used_mb=float(user.quota.storage_used_mb),
+            video_limit=user.quota.video_limit,
+            video_used=user.quota.video_used,
+            token_limit=user.quota.token_limit,
+            token_used=user.quota.token_used
+        )
     return AuthUserResponse(
         id=user.id,
         email=user.email,
@@ -22,29 +38,54 @@ def _build_user_response(user: User) -> AuthUserResponse:
         avatar_url=user.avatar_url,
         role=user.role,
         created_at=user.created_at,
+        quota=quota_resp,
     )
 
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
-async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def register(
+    request: Request,
+    payload: RegisterRequest,
+    db: AsyncSession = Depends(get_db)
+) -> AuthResponse:
+    """Register a new user, automatically provisioning a default quota."""
     service = AuthService(UserRepository(db))
     user = await service.register(payload.email, payload.password, payload.full_name)
     access_token = service.build_access_token(user.id)
     refresh_token = service.build_refresh_token(user.id)
-    return AuthResponse(user=_build_user_response(user), token=TokenResponse(access_token=access_token, refresh_token=refresh_token))
+    return AuthResponse(
+        user=_build_user_response(user),
+        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    )
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def login(
+    request: Request,
+    payload: LoginRequest,
+    db: AsyncSession = Depends(get_db)
+) -> AuthResponse:
+    """Authenticate credentials and return JWT tokens."""
     service = AuthService(UserRepository(db))
     user = await service.authenticate(payload.email, payload.password)
     access_token = service.build_access_token(user.id)
     refresh_token = service.build_refresh_token(user.id)
-    return AuthResponse(user=_build_user_response(user), token=TokenResponse(access_token=access_token, refresh_token=refresh_token))
+    return AuthResponse(
+        user=_build_user_response(user),
+        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    )
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def refresh(
+    request: Request,
+    payload: RefreshRequest,
+    db: AsyncSession = Depends(get_db)
+) -> TokenResponse:
+    """Exchange a valid refresh token for a new pair of access and refresh tokens."""
     token_payload = decode_token(payload.refresh_token)
     if not token_payload or token_payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -63,4 +104,5 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -
 
 @router.get("/me", response_model=AuthUserResponse)
 async def me(current_user: User = Depends(get_current_user)) -> AuthUserResponse:
+    """Get current authenticated user profile details."""
     return _build_user_response(current_user)

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import get_current_user
@@ -23,19 +23,37 @@ from app.schemas.study import (
     QuizResultResponse,
 )
 
+# Core/Limiter imports
+from app.core.limiter import limiter
+from app.core.config import settings
+
 router = APIRouter()
 
 
 @router.post("/quiz/generate", response_model=QuizJobResponse, status_code=202)
+@limiter.limit(settings.RATE_LIMIT_CHAT)
 async def generate_quiz(
+    request: Request,
     payload: QuizGenerateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> QuizJobResponse:
+    """Trigger background quiz generation via Celery."""
     from app.tasks.quiz_tasks import dispatch_generate_quiz
 
     job_id = dispatch_generate_quiz(str(payload.document_id), payload.quiz_type, payload.question_count)
     return QuizJobResponse(job_id=job_id, status="processing")
+
+
+@router.get("/quiz/job/{job_id}")
+async def get_quiz_job(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve status or results of a background quiz generation job."""
+    from app.tasks.quiz_tasks import get_quiz_job_status
+    return get_quiz_job_status(job_id)
 
 
 @router.post("/quiz/{quiz_id}/submit", response_model=QuizResultResponse)
@@ -45,6 +63,7 @@ async def submit_quiz(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> QuizResultResponse:
+    """Submit answers to a generated quiz and get correct answers comparison."""
     from app.tasks.quiz_tasks import get_quiz_results
 
     results = get_quiz_results(str(quiz_id), [a.model_dump() for a in payload.answers])
@@ -59,11 +78,14 @@ async def submit_quiz(
 
 
 @router.post("/flashcards/generate", response_model=FlashcardResponse, status_code=201)
+@limiter.limit(settings.RATE_LIMIT_CHAT)
 async def generate_flashcards(
+    request: Request,
     payload: FlashcardGenerateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FlashcardResponse:
+    """Trigger flashcard generation in the background."""
     repo = StudyRepository(db)
 
     flashcard = Flashcard(
@@ -77,12 +99,13 @@ async def generate_flashcards(
 
     await dispatch_generate_flashcards(str(flashcard.id), str(payload.document_id), payload.set_name, payload.count)
 
+    from datetime import datetime, timezone
     return FlashcardResponse(
         id=flashcard.id,
         set_name=flashcard.set_name,
         document_id=flashcard.document_id,
         items=[],
-        created_at=flashcard.created_at,
+        created_at=datetime.now(timezone.utc),
     )
 
 
@@ -92,6 +115,7 @@ async def get_flashcard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FlashcardResponse:
+    """Get flashcards and eager loaded items."""
     repo = StudyRepository(db)
     flashcard = await repo.get_flashcard(flashcard_id)
     if not flashcard or flashcard.user_id != current_user.id:
@@ -116,11 +140,14 @@ async def get_flashcard(
 
 
 @router.post("/essay/submit", response_model=EssayResponse)
+@limiter.limit(settings.RATE_LIMIT_CHAT)
 async def submit_essay(
+    request: Request,
     payload: EssaySubmitRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> EssayResponse:
+    """Submit essay and get automatic scoring using async AI Client."""
     repo = StudyRepository(db)
 
     submission = EssaySubmission(
@@ -130,20 +157,10 @@ async def submit_essay(
     )
     submission = await repo.create_essay_submission(submission)
 
-    import httpx
-    from app.core.config import settings
+    from app.clients.ai_client import AiClient
 
     try:
-        response = httpx.post(
-            f"{settings.AI_SERVICE_URL}/study/essay/grade",
-            json={
-                "document_id": str(payload.document_id),
-                "essay_text": payload.essay_text,
-            },
-            timeout=60,
-        )
-        response.raise_for_status()
-        data = response.json()
+        data = await AiClient().grade_essay(str(payload.document_id), payload.essay_text)
     except Exception:
         data = {"score": 0, "feedback": "AI service unavailable", "comparisons": []}
 

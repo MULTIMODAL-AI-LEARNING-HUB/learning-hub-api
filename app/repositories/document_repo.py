@@ -30,8 +30,21 @@ class DocumentRepository(BaseRepository):
         return list(result.scalars().all())
 
     async def count_by_user(self, user_id: UUID) -> int:
-        result = await self.db.execute(select(Document).where(Document.user_id == user_id))
-        return len(result.scalars().all())
+        from sqlalchemy import func
+        result = await self.db.execute(
+            select(func.count(Document.id)).where(Document.user_id == user_id)
+        )
+        return result.scalar() or 0
+
+    async def update_status(self, doc_id: UUID, status: str, metadata: dict | None = None) -> Document | None:
+        doc = await self.get_by_id(doc_id)
+        if doc:
+            doc.status = status
+            if metadata is not None:
+                doc.file_metadata = metadata
+            await self.db.commit()
+            await self.db.refresh(doc)
+        return doc
 
     async def delete(self, doc_id: UUID) -> None:
         await self.db.execute(delete(Document).where(Document.id == doc_id))

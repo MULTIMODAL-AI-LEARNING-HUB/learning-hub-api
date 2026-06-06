@@ -1,6 +1,6 @@
 """Admin API endpoints."""
 
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 

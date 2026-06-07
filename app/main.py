@@ -18,10 +18,9 @@ from app.clients.ai_client import get_ai_client, close_ai_client
 from app.core.limiter import limiter, rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle events to manage shared resource connection pools."""
+    """Lifecycle events to manage shared resource connection pools"""
     # 1. Initialize Redis Pool
     get_redis_client()
     # 2. Initialize AI Service Async Client Pool

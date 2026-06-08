@@ -19,7 +19,7 @@ class Quota(Base):
     video_used: Mapped[int] = mapped_column(Integer, default=0)
     token_limit: Mapped[int] = mapped_column(Integer, default=50000)
     token_used: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="quota")

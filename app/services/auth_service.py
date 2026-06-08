@@ -16,16 +16,8 @@ class AuthService:
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
-        user = User(
-            email=email,
-            password_hash=hash_password(password),
-            full_name=full_name,
-        )
-        user = await self.repo.create(user)
-
         from app.models.quota import Quota
         quota = Quota(
-            user_id=user.id,
             storage_limit_mb=1024,
             storage_used_mb=0,
             video_limit=5,
@@ -33,8 +25,13 @@ class AuthService:
             token_limit=50000,
             token_used=0
         )
-        self.repo.db.add(quota)
-        await self.repo.db.commit()
+        user = User(
+            email=email,
+            password_hash=hash_password(password),
+            full_name=full_name,
+            quota=quota,
+        )
+        user = await self.repo.create(user)
         return user
 
     async def authenticate(self, email: str, password: str) -> User:

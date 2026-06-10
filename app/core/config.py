@@ -33,10 +33,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_UPLOAD: str = "5/minute"
     RATE_LIMIT_ADMIN: str = "60/minute"
 
-    SECRET_KEY: str = "change-me"
+    SECRET_KEY: str = "mysecretkey"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     CORS_ORIGINS: Any = ["http://localhost:5173"]
 

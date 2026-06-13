@@ -68,6 +68,14 @@ class Settings(BaseSettings):
 
     AI_SERVICE_URL: str = "http://localhost:8001"
 
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 1025
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = False
+    MAIL_FROM: str = "noreply@learninghub.ai"
+    MAIL_FROM_NAME: str = "Learning Hub"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -10,7 +10,17 @@ from app.dependencies.db import get_db
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.core.security import decode_token
-from app.schemas import AuthResponse, AuthUserResponse, LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
+from app.schemas import (
+    AuthResponse,
+    AuthUserResponse,
+    ForgotPasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    RefreshRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+)
 from app.services.auth_service import AuthService
 
 from app.core.limiter import limiter
@@ -106,3 +116,31 @@ async def refresh(
 async def me(current_user: User = Depends(get_current_user)) -> AuthUserResponse:
     """Get current authenticated user profile details."""
     return _build_user_response(current_user)
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("2/minute")
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+) -> MessageResponse:
+    """Send a password reset email if the email exists in the system."""
+    service = AuthService(UserRepository(db))
+    await service.forgot_password(payload.email)
+    return MessageResponse(
+        message="If the email exists, a reset link has been sent. Please check your inbox."
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+) -> MessageResponse:
+    """Reset password using a valid reset token."""
+    service = AuthService(UserRepository(db))
+    await service.reset_password(payload.token, payload.password)
+    return MessageResponse(message="Password has been reset successfully.")

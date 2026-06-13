@@ -1,4 +1,4 @@
-from app.schemas.auth import AuthResponse, AuthUserResponse, LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import AuthResponse, AuthUserResponse, ForgotPasswordRequest, LoginRequest, MessageResponse, RefreshRequest, RegisterRequest, ResetPasswordRequest, TokenResponse
 from app.schemas.documents import (
     DocumentListResponse,
     DocumentResponse,
@@ -18,9 +18,12 @@ from app.schemas.chat import (
 __all__ = [
     "AuthResponse",
     "AuthUserResponse",
+    "ForgotPasswordRequest",
     "LoginRequest",
+    "MessageResponse",
     "RefreshRequest",
     "RegisterRequest",
+    "ResetPasswordRequest",
     "TokenResponse",
     "DocumentListResponse",
     "DocumentResponse",

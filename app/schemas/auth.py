@@ -47,3 +47,16 @@ class AuthUserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: AuthUserResponse
     token: TokenResponse
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8)
+
+
+class MessageResponse(BaseModel):
+    message: str

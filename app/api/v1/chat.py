@@ -10,6 +10,7 @@ from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.user import User
 from app.repositories.chat_repo import ChatRepository
+from app.repositories.document_repo import DocumentRepository
 from app.schemas import (
     ChatAskRequest,
     ChatMessageResponse,
@@ -129,11 +130,12 @@ async def ask(
     # Save the user query to the database
     await service.add_user_message(session.id, payload.query)
 
-    # Verify ownership of requested document IDs
+    # Verify ownership of requested document IDs (batch query)
     doc_repo = DocumentRepository(db)
+    docs = await doc_repo.get_by_ids(payload.document_ids or [])
+    owned_ids = {d.id for d in docs if d.user_id == current_user.id}
     for doc_id in payload.document_ids or []:
-        doc = await doc_repo.get_by_id(doc_id)
-        if not doc or doc.user_id != current_user.id:
+        if doc_id not in owned_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied for document ID: {doc_id}"

@@ -19,6 +19,12 @@ class DocumentRepository(BaseRepository):
         result = await self.db.execute(select(Document).where(Document.id == doc_id))
         return result.scalar_one_or_none()
 
+    async def get_by_ids(self, doc_ids: list[UUID]) -> list[Document]:
+        result = await self.db.execute(
+            select(Document).where(Document.id.in_(doc_ids))
+        )
+        return list(result.scalars().all())
+
     async def list_by_user(self, user_id: UUID, offset: int, limit: int) -> list[Document]:
         result = await self.db.execute(
             select(Document)

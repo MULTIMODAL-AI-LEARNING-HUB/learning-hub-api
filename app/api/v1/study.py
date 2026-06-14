@@ -39,6 +39,14 @@ async def generate_quiz(
     current_user: User = Depends(get_current_user),
 ) -> QuizJobResponse:
     """Trigger background quiz generation via Celery."""
+    from app.repositories.document_repo import DocumentRepository
+    doc = await DocumentRepository(db).get_by_id(payload.document_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied for document"
+        )
+
     from app.tasks.quiz_tasks import dispatch_generate_quiz
 
     job_id = dispatch_generate_quiz(str(payload.document_id), payload.quiz_type, payload.question_count)
@@ -86,6 +94,14 @@ async def generate_flashcards(
     current_user: User = Depends(get_current_user),
 ) -> FlashcardResponse:
     """Trigger flashcard generation in the background."""
+    from app.repositories.document_repo import DocumentRepository
+    doc = await DocumentRepository(db).get_by_id(payload.document_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied for document"
+        )
+
     repo = StudyRepository(db)
 
     flashcard = Flashcard(
@@ -148,6 +164,14 @@ async def submit_essay(
     current_user: User = Depends(get_current_user),
 ) -> EssayResponse:
     """Submit essay and get automatic scoring using async AI Client."""
+    from app.repositories.document_repo import DocumentRepository
+    doc = await DocumentRepository(db).get_by_id(payload.document_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied for document"
+        )
+
     repo = StudyRepository(db)
 
     submission = EssaySubmission(
@@ -160,7 +184,7 @@ async def submit_essay(
     from app.clients.ai_client import AiClient
 
     try:
-        data = await AiClient().grade_essay(str(payload.document_id), payload.essay_text)
+        data = await AiClient().grade_essay(str(payload.document_id), payload.essay_text, str(current_user.id))
     except Exception:
         data = {"score": 0, "feedback": "AI service unavailable", "comparisons": []}
 

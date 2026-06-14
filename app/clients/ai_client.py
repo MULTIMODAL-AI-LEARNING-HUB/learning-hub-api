@@ -42,7 +42,8 @@ class AiClient:
     )
     async def ask(self, payload: dict) -> dict[str, Any]:
         """Send chat query to AI service."""
-        response = await self.client.post("/chat/ask", json=payload)
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
+        response = await self.client.post("/chat/ask", json=payload, headers=headers)
         response.raise_for_status()
         return response.json()
 
@@ -51,14 +52,17 @@ class AiClient:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True
     )
-    async def grade_essay(self, document_id: str, essay_text: str) -> dict[str, Any]:
+    async def grade_essay(self, document_id: str, essay_text: str, user_id: str | None = None) -> dict[str, Any]:
         """Grade essay matching against source document."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
         response = await self.client.post(
             "/study/essay/grade",
             json={
                 "document_id": document_id,
+                "user_id": user_id,
                 "essay_text": essay_text,
-            }
+            },
+            headers=headers
         )
         response.raise_for_status()
         return response.json()

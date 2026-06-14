@@ -129,6 +129,16 @@ async def ask(
     # Save the user query to the database
     await service.add_user_message(session.id, payload.query)
 
+    # Verify ownership of requested document IDs
+    doc_repo = DocumentRepository(db)
+    for doc_id in payload.document_ids or []:
+        doc = await doc_repo.get_by_id(doc_id)
+        if not doc or doc.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied for document ID: {doc_id}"
+            )
+
     # Call AI service with our singleton HTTP client
     ai_response = await AiClient().ask(
         {

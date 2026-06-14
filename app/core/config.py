@@ -67,6 +67,7 @@ class Settings(BaseSettings):
         return v
 
     AI_SERVICE_URL: str = "http://localhost:8001"
+    INTERNAL_API_KEY: str = "your_internal_api_key"
 
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025

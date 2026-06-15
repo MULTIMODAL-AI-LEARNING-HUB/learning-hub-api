@@ -64,6 +64,17 @@ class Settings(BaseSettings):
                 v = v.replace("postgres://", "postgresql://", 1)
             if v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
                 v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            
+            # Strip 'pgbouncer' query parameter as asyncpg doesn't support it
+            from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+            try:
+                parsed = urlparse(v)
+                if parsed.query:
+                    query_params = parse_qsl(parsed.query)
+                    filtered_params = [(k, val) for k, val in query_params if k.lower() != 'pgbouncer']
+                    v = urlunparse(parsed._replace(query=urlencode(filtered_params)))
+            except Exception:
+                pass
         return v
 
     AI_SERVICE_URL: str = "http://localhost:8001"

@@ -51,7 +51,7 @@ class Settings(BaseSettings):
                     return json.loads(v)
                 except Exception:
                     v = v[1:-1]
-            return [i.strip() for i in v.split(",") if i.strip()]
+            return [i.strip().strip("'\"") for i in v.split(",") if i.strip()]
         elif isinstance(v, list):
             return v
         raise ValueError(v)

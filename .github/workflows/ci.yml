@@ -104,4 +104,11 @@ jobs:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: |
           heroku stack:set container --app ${{ secrets.HEROKU_APP_NAME_API }}
-          heroku container:release web release --app ${{ secrets.HEROKU_APP_NAME_API }}
+          heroku container:release web release --app ${{ secrets.HEROKU_APP_NAME_API }} || {
+            echo "========================================="
+            echo "Release failed! Fetching Heroku release logs..."
+            echo "========================================="
+            heroku releases --app ${{ secrets.HEROKU_APP_NAME_API }} -n 5
+            heroku logs --app ${{ secrets.HEROKU_APP_NAME_API }} -n 100
+            exit 1
+          }

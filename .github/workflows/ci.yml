@@ -69,13 +69,27 @@ jobs:
           username: _
           password: ${{ secrets.HEROKU_API_KEY }}
 
-      - name: Build and push Docker image
+      - name: Build and push Web Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
+          target: runner
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/web
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Release Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: release
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/release
           provenance: false
           sbom: false
           cache-from: type=gha
@@ -90,4 +104,4 @@ jobs:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: |
           heroku stack:set container --app ${{ secrets.HEROKU_APP_NAME_API }}
-          heroku container:release web --app ${{ secrets.HEROKU_APP_NAME_API }}
+          heroku container:release web release --app ${{ secrets.HEROKU_APP_NAME_API }}

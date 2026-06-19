@@ -112,7 +112,8 @@ async def upload(
     document = await repo.create(document)
 
     # Update quota usages
-    current_user.quota.storage_used_mb = used + file_size_mb
+    if current_user.quota:
+        current_user.quota.storage_used_mb = (current_user.quota.storage_used_mb or 0.0) + file_size_mb
     await db.commit()
 
     # 5. Invalidate document caches

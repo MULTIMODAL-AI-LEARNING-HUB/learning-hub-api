@@ -113,7 +113,7 @@ async def generate_flashcards(
 
     from app.tasks.flashcard_tasks import dispatch_generate_flashcards
 
-    await dispatch_generate_flashcards(str(flashcard.id), str(payload.document_id), payload.set_name, payload.count)
+    dispatch_generate_flashcards(str(flashcard.id), str(payload.document_id), payload.set_name, payload.count)
 
     from datetime import datetime, timezone
     return FlashcardResponse(

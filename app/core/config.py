@@ -1,5 +1,5 @@
 from typing import Any
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_UPLOAD: str = "5/minute"
     RATE_LIMIT_ADMIN: str = "60/minute"
 
-    SECRET_KEY: str = "mysecretkey"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -78,7 +78,7 @@ class Settings(BaseSettings):
         return v
 
     AI_SERVICE_URL: str = "http://localhost:8001"
-    INTERNAL_API_KEY: str = "your_internal_api_key"
+    INTERNAL_API_KEY: str = ""
 
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025
@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = False
     MAIL_FROM: str = "noreply@learninghub.ai"
     MAIL_FROM_NAME: str = "Learning Hub"
+
+    @model_validator(mode="after")
+    def validate_secrets(self) -> "Settings":
+        if not self.DEBUG:
+            if not self.SECRET_KEY or self.SECRET_KEY in {"", "mysecretkey", "your_secret_key_for_jwt"}:
+                raise ValueError("SECRET_KEY must be a secure, non-default string in production")
+            if not self.INTERNAL_API_KEY or self.INTERNAL_API_KEY in {"", "your_internal_api_key"}:
+                raise ValueError("INTERNAL_API_KEY must be a secure, non-default string in production")
+        return self
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

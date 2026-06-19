@@ -54,7 +54,7 @@ class AuthService:
             return
 
         token = secrets.token_urlsafe(32)
-        expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+        expiry = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
         await self.repo.set_reset_token(user.id, token, expiry)
         await EmailService.send_password_reset(user.email, token, user.full_name)
 

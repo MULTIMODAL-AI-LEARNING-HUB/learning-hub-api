@@ -63,9 +63,14 @@ class RedisCache:
             return False
 
     async def delete_pattern(self, pattern: str) -> bool:
-        """Delete keys matching pattern."""
+        """Delete keys matching pattern in a non-blocking way using SCAN."""
         try:
-            keys = await self.redis.keys(pattern)
+            keys = []
+            async for key in self.redis.scan_iter(match=pattern):
+                keys.append(key)
+                if len(keys) >= 500:
+                    await self.redis.delete(*keys)
+                    keys = []
             if keys:
                 await self.redis.delete(*keys)
             return True

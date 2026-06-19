@@ -107,8 +107,9 @@ async def refresh(
     user = await repo.get_by_id(UUID(user_id))
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    access_token = AuthService.build_access_token(user.id)
-    refresh_token = AuthService.build_refresh_token(user.id)
+    service = AuthService(repo)
+    access_token = service.build_access_token(user.id)
+    refresh_token = service.build_refresh_token(user.id)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 

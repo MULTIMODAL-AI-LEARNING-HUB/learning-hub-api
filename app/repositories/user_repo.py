@@ -65,7 +65,7 @@ class UserRepository(BaseRepository):
     async def get_user_by_reset_token(self, token: str) -> User | None:
         result = await self.db.execute(
             select(User)
-            .where(User.reset_token == token, User.reset_token_expiry > datetime.now(timezone.utc).replace(tzinfo=None))
+            .where(User.reset_token == token, User.reset_token_expiry > datetime.now(timezone.utc))
             .options(selectinload(User.quota))
         )
         return result.scalar_one_or_none()

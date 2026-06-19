@@ -73,16 +73,21 @@ async def list_sessions(
     total = await repo.count_sessions(current_user.id)
     pagination = build_pagination(total, page, page_size)
     
-    items = [
-        ChatSessionListItem(
-            id=s.id,
-            title=s.title,
-            document_id=s.document_id,
-            updated_at=s.updated_at,
-            last_message=s.messages[-1].content if s.messages else None,
+    items = []
+    for s in sessions:
+        try:
+            last_msg = s.messages[-1].content if s.messages else None
+        except Exception:
+            last_msg = None
+        items.append(
+            ChatSessionListItem(
+                id=s.id,
+                title=s.title,
+                document_id=s.document_id,
+                updated_at=s.updated_at,
+                last_message=last_msg,
+            )
         )
-        for s in sessions
-    ]
     response_data = ChatSessionListResponse(
         items=items,
         total=pagination["total"],

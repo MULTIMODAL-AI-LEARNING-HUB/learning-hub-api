@@ -109,3 +109,12 @@ ALGORITHM=HS256
 - [Main Docs](../README.md) - System overview
 - [API Contracts](../communication/api-contracts.md) - Service contracts
 - [System Design](../3-architecture/system-design.md) - Architecture details
+
+## CI/CD Secrets Validation Bypass
+
+In production mode (`DEBUG=False`), the application settings class `Settings` ([app/core/config.py](file:///d:/Laptrinh/Project_Practice/MULTIMODAL%20AI%20LEARNING%20HUB/learning-hub-api/app/core/config.py)) validates that both `SECRET_KEY` and `INTERNAL_API_KEY` are secure and non-default.
+
+To prevent build/deployment pipeline crashes (such as Heroku's release command `alembic upgrade head`) or local/CI test suite failures (`pytest`) when these keys are not yet configured or populated in the environment:
+
+- Validation is **automatically bypassed** if the process is identified as a database migration (`alembic` is running) or a test runner (`pytest` is executing).
+- For runtime services (like the production Uvicorn web dyno), the security checks remain **fully active** to guarantee that the server will fail to start if not configured with secure keys.

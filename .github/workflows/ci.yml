@@ -69,7 +69,7 @@ jobs:
           username: _
           password: ${{ secrets.HEROKU_API_KEY }}
 
-      - name: Build and push Web Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -77,19 +77,6 @@ jobs:
           target: runner
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/web
-          provenance: false
-          sbom: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push Release Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          target: release
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/release
           provenance: false
           sbom: false
           cache-from: type=gha
@@ -104,7 +91,7 @@ jobs:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: |
           heroku stack:set container --app ${{ secrets.HEROKU_APP_NAME_API }}
-          heroku container:release web release --app ${{ secrets.HEROKU_APP_NAME_API }} || {
+          heroku container:release web --app ${{ secrets.HEROKU_APP_NAME_API }} || {
             echo "========================================="
             echo "Release failed! Fetching Heroku release logs..."
             echo "========================================="
@@ -112,3 +99,21 @@ jobs:
             heroku logs --app ${{ secrets.HEROKU_APP_NAME_API }} -n 100
             exit 1
           }
+
+      - name: Health Check
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          echo "Waiting for dyno to start..."
+          sleep 20
+          echo "Checking dyno status..."
+          heroku ps --app ${{ secrets.HEROKU_APP_NAME_API }}
+          HEROKU_APP_URL=$(heroku apps:info --app ${{ secrets.HEROKU_APP_NAME_API }} --json | python3 -c "import sys, json; print(json.load(sys.stdin)['web_url'])")
+          echo "Checking health endpoint at: ${HEROKU_APP_URL}health"
+          curl -f -s -o /dev/null -w "%{http_code}" "${HEROKU_APP_URL}health" || {
+            echo "Health check failed! Logs:"
+            heroku logs --app ${{ secrets.HEROKU_APP_NAME_API }} -n 50
+            exit 1
+          }
+          echo "Health check passed!"

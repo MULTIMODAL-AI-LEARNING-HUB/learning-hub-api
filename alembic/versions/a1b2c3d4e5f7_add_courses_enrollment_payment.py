@@ -146,6 +146,8 @@ def upgrade() -> None:
 
     op.create_index(op.f('ix_chat_sessions_course_id'), 'chat_sessions', ['course_id'], unique=False)
 
+    op.execute("UPDATE users SET role = 'student' WHERE role = 'user'")
+
     op.create_check_constraint('chk_user_role', 'users',
         sa.text("role IN ('admin', 'lecturer', 'student')"))
 

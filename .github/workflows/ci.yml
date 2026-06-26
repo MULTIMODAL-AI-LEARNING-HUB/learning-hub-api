@@ -109,7 +109,7 @@ jobs:
           sleep 20
           echo "Checking dyno status..."
           heroku ps --app ${{ secrets.HEROKU_APP_NAME_API }}
-          HEROKU_APP_URL=$(heroku apps:info --app ${{ secrets.HEROKU_APP_NAME_API }} --json | python3 -c "import sys, json; print(json.load(sys.stdin)['web_url'])")
+          HEROKU_APP_URL=$(heroku apps:info --app ${{ secrets.HEROKU_APP_NAME_API }} | grep -i "web_url" | awk '{print $2}')
           echo "Checking health endpoint at: ${HEROKU_APP_URL}health"
           curl -f -s -o /dev/null -w "%{http_code}" "${HEROKU_APP_URL}health" || {
             echo "Health check failed! Logs:"

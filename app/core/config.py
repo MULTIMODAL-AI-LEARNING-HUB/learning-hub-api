@@ -90,6 +90,18 @@ class Settings(BaseSettings):
     MAIL_FROM: str = "noreply@learninghub.ai"
     MAIL_FROM_NAME: str = "Learning Hub"
 
+    # Payment Gateway Configuration
+    VNPAY_URL: str = "https://sandbox.vnpay.vn/payv2/vpcpay.html"
+    VNPAY_MERCHANT_ID: str = ""
+    VNPAY_HASH_SECRET: str = ""
+    VNPAY_RETURN_URL: str = "http://localhost:5173/payment/return"
+
+    MOMO_URL: str = "https://test-payment.momo.vn/v2/gateway/api/create"
+    MOMO_PARTNER_CODE: str = ""
+    MOMO_ACCESS_KEY: str = ""
+    MOMO_SECRET_KEY: str = ""
+    MOMO_RETURN_URL: str = "http://localhost:5173/payment/return"
+
     @model_validator(mode="after")
     def validate_secrets(self) -> "Settings":
         if not self.DEBUG:

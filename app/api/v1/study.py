@@ -18,6 +18,7 @@ from app.schemas.study import (
     FlashcardResponse,
     FlashcardItemResponse,
     QuizGenerateRequest,
+    QuizGenerateByCourseRequest,
     QuizJobResponse,
     QuizSubmitRequest,
     QuizResultResponse,
@@ -50,6 +51,40 @@ async def generate_quiz(
     from app.tasks.quiz_tasks import dispatch_generate_quiz
 
     job_id = dispatch_generate_quiz(str(payload.document_id), payload.quiz_type, payload.question_count)
+    return QuizJobResponse(job_id=job_id, status="processing")
+
+
+@router.post("/quiz/by-course", response_model=QuizJobResponse, status_code=202)
+@limiter.limit(settings.RATE_LIMIT_CHAT)
+async def generate_quiz_by_course(
+    request: Request,
+    payload: QuizGenerateByCourseRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> QuizJobResponse:
+    """Trigger quiz generation from course materials via AI service."""
+    from app.repositories.course_repo import CourseRepository
+    from app.repositories.enrollment_repo import EnrollmentRepository
+
+    course = await CourseRepository(db).get_by_id(str(payload.course_id))
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    enrollment = await EnrollmentRepository(db).get_by_user_and_course(current_user.id, str(payload.course_id))
+    if not enrollment and course.price > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must be enrolled to generate quiz from this course"
+        )
+
+    from app.tasks.quiz_tasks import dispatch_generate_quiz_by_course
+    material_ids = [str(m) for m in (payload.material_ids or [])]
+    job_id = dispatch_generate_quiz_by_course(
+        str(payload.course_id),
+        material_ids,
+        payload.quiz_type,
+        payload.question_count
+    )
     return QuizJobResponse(job_id=job_id, status="processing")
 
 

@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from app.models.flashcard import Flashcard
     from app.models.essay import EssaySubmission
     from app.models.quota import Quota
+    from app.models.course import Course
+    from app.models.enrollment import Enrollment
 
 class User(Base):
     __tablename__ = "users"
@@ -33,3 +35,5 @@ class User(Base):
     flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     essay_submissions: Mapped[list["EssaySubmission"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     quota: Mapped["Quota"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
+    courses: Mapped[list["Course"]] = relationship(back_populates="lecturer", cascade="all, delete-orphan")
+    enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student", cascade="all, delete-orphan")

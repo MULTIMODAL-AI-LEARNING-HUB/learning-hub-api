@@ -1,14 +1,12 @@
-FROM python:3.10-slim AS builder
+FROM python:3.10-slim
 
 WORKDIR /app
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-FROM python:3.10-slim AS base
-
-WORKDIR /app
-COPY --from=builder /usr/local /usr/local
 COPY . .
 
-FROM base AS runner
-ENTRYPOINT ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+ENV PYTHONUNBUFFERED=1
+
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"]

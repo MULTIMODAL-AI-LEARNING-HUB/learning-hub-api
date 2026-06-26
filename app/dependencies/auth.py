@@ -1,7 +1,6 @@
 """Auth dependencies for request validation."""
 
 from uuid import UUID
-from functools import wraps
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer

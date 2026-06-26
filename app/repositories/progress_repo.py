@@ -4,7 +4,6 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy import select, delete, func, and_
-from sqlalchemy.dialects.postgresql import insert
 
 from app.models.material_progress import MaterialProgress
 from app.repositories.base import BaseRepository
@@ -85,7 +84,7 @@ class ProgressRepository(BaseRepository):
             select(func.count(MaterialProgress.id)).where(
                 and_(
                     MaterialProgress.enrollment_id == enrollment_id,
-                    MaterialProgress.completed == True
+                    MaterialProgress.completed
                 )
             )
         )

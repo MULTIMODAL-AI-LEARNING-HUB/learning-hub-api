@@ -14,7 +14,6 @@ from app.schemas import (
     CategoryResponse,
     CategoryTreeResponse,
     CategoryUpdate,
-    MessageResponse,
 )
 from app.services.category_service import CategoryService
 

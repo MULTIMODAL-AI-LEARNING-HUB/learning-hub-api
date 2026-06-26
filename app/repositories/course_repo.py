@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select, delete, func, and_, or_
+from sqlalchemy import select, delete, func, or_
 from sqlalchemy.orm import selectinload
 
 from app.models.course import Course

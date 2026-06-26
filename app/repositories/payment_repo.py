@@ -1,7 +1,7 @@
 """Payment repository."""
 
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import select, func
 

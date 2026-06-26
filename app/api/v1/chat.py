@@ -9,7 +9,7 @@ from app.clients.ai_client import AiClient
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.user import User
-from app.models.chat import ChatSession, ChatMessage
+from app.models.chat import ChatSession
 from app.repositories.chat_repo import ChatRepository
 from app.repositories.course_repo import CourseRepository
 from app.repositories.enrollment_repo import EnrollmentRepository

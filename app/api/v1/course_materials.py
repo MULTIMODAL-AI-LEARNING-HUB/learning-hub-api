@@ -13,14 +13,12 @@ from app.models.course_material import CourseMaterial
 from app.repositories.course_repo import CourseRepository
 from app.repositories.course_material_repo import CourseMaterialRepository
 from app.schemas import (
-    CourseMaterialCreate,
     CourseMaterialListResponse,
     CourseMaterialResponse,
     CourseMaterialUpdate,
 )
 from app.services.course_service import CourseService
 from app.clients.minio_client import MinioClient
-from app.core.config import settings
 
 router = APIRouter(prefix="/{course_id}/materials", tags=["course-materials"])
 

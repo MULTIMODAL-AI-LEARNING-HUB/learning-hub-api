@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from sqlalchemy import String, DateTime, ForeignKey, Integer, Boolean
+from sqlalchemy import DateTime, ForeignKey, Integer, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base

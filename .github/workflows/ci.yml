@@ -109,7 +109,7 @@ jobs:
           sleep 30
           echo "Checking dyno status..."
           heroku ps --app ${{ secrets.HEROKU_APP_NAME_API }}
-          HEROKU_APP_URL=$(heroku apps:info --app ${{ secrets.HEROKU_APP_NAME_API }} | grep -i "web_url" | awk '{print $2}')
+          HEROKU_APP_URL=$(heroku apps:info --app ${{ secrets.HEROKU_APP_NAME_API }} --shell | grep -i "web_url" | cut -d'=' -f2)
           if [ -z "$HEROKU_APP_URL" ]; then
             HEROKU_APP_URL="https://${{ secrets.HEROKU_APP_NAME_API }}.herokuapp.com/"
           fi

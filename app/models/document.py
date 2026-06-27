@@ -8,7 +8,6 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
-    from app.models.chat import ChatSession
     from app.models.flashcard import Flashcard
     from app.models.essay import EssaySubmission
 
@@ -29,6 +28,5 @@ class Document(Base):
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents")
-    chat_sessions: Mapped[list["ChatSession"]] = relationship(back_populates="document")
     flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="document")
     essay_submissions: Mapped[list["EssaySubmission"]] = relationship(back_populates="document")

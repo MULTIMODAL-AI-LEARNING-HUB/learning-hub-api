@@ -17,7 +17,7 @@ class AuthService:
     def __init__(self, repo: UserRepository):
         self.repo = repo
 
-    async def register(self, email: str, password: str, full_name: str | None) -> User:
+    async def register(self, email: str, password: str, full_name: str | None, role: str = "student") -> User:
         existing = await self.repo.get_by_email(email)
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
@@ -35,6 +35,7 @@ class AuthService:
             email=email,
             password_hash=hash_password(password),
             full_name=full_name,
+            role=role,
             quota=quota,
         )
         user = await self.repo.create(user)

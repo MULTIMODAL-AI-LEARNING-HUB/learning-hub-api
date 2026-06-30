@@ -15,7 +15,7 @@ from app.schemas.course_content import (
     QuizAttemptSubmit, QuizAttemptResponse, QuizAttemptResult,
     ReorderQuestions
 )
-from app.dependencies.auth import get_current_user, require_lecturer, get_current_active_user
+from app.dependencies.auth import get_current_user, require_lecturer, require_active_user
 from app.models.user import User
 
 router = APIRouter(prefix="/lessons/{lesson_id}/quiz", tags=["Quizzes"])
@@ -322,7 +322,7 @@ async def toggle_correct_answer(
 async def start_quiz_attempt(
     lesson_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
 
@@ -369,7 +369,7 @@ async def submit_quiz_attempt(
     attempt_id: UUID,
     submission: QuizAttemptSubmit,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
 
@@ -426,7 +426,7 @@ async def submit_quiz_attempt(
 async def get_my_attempts(
     lesson_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
 

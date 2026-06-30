@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.models import Course, Enrollment, Review
 from app.schemas.course_content import ReviewCreate, ReviewUpdate, ReviewResponse, LecturerReply
-from app.dependencies.auth import get_current_user, require_lecturer
+from app.dependencies.auth import get_current_user, require_lecturer, require_active_user
 from app.models.user import User
 
 router = APIRouter(prefix="/courses/{course_id}/reviews", tags=["Reviews"])
@@ -69,7 +69,7 @@ async def create_review(
     course_id: UUID,
     review_data: ReviewCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     course = await get_course_or_404(db, course_id)
 
@@ -129,7 +129,7 @@ async def create_review(
 async def get_my_review(
     course_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     course = await get_course_or_404(db, course_id)
 
@@ -166,7 +166,7 @@ async def update_my_review(
     course_id: UUID,
     review_data: ReviewUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     course = await get_course_or_404(db, course_id)
 

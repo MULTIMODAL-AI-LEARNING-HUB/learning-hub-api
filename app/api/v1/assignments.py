@@ -12,7 +12,7 @@ from app.schemas.course_content import (
     AssignmentCreate, AssignmentUpdate, AssignmentResponse, AssignmentWithSubmissions,
     SubmissionCreate, SubmissionGrade, SubmissionResponse
 )
-from app.dependencies.auth import get_current_user, require_lecturer, get_current_active_user
+from app.dependencies.auth import get_current_user, require_lecturer, require_active_user
 from app.models.user import User
 
 router = APIRouter(prefix="/lessons/{lesson_id}/assignment", tags=["Assignments"])
@@ -127,7 +127,7 @@ async def create_submission(
     lesson_id: UUID,
     submission_data: SubmissionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
 
@@ -196,7 +196,7 @@ async def create_submission(
 async def get_my_submissions(
     lesson_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
 

@@ -2,6 +2,12 @@ from fastapi import APIRouter
 
 from app.api.v1 import auth, documents, chat, study, admin, categories, courses, enrollments, progress
 from app.api.v1.course_materials import router as course_materials_router
+from app.api.v1.sections import router as sections_router
+from app.api.v1.lessons import router as lessons_router
+from app.api.v1.quizzes import router as quizzes_router
+from app.api.v1.assignments import router as assignments_router
+from app.api.v1.discussions import router as discussions_router
+from app.api.v1.reviews import router as reviews_router
 from app.webhooks.payment_webhooks import router as payment_webhooks_router
 
 api_router = APIRouter()
@@ -10,6 +16,12 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
 api_router.include_router(courses.router, prefix="/courses", tags=["courses"])
 api_router.include_router(course_materials_router, prefix="/courses")
+api_router.include_router(sections_router, prefix="/courses")
+api_router.include_router(lessons_router, prefix="/courses")
+api_router.include_router(quizzes_router, prefix="/lessons")
+api_router.include_router(assignments_router, prefix="/lessons")
+api_router.include_router(discussions_router, prefix="/lessons")
+api_router.include_router(reviews_router, prefix="/courses", tags=["reviews"])
 api_router.include_router(enrollments.router, tags=["enrollments"])
 api_router.include_router(progress.router, tags=["progress"])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])

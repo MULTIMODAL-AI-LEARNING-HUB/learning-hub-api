@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from sqlalchemy import String, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -20,12 +20,14 @@ class Enrollment(Base):
 
     payment_amount_vnd: Mapped[int] = mapped_column(Integer, default=0)
     payment_status: Mapped[str] = mapped_column(String(50), default="pending")
-    payment_method: Mapped[str | None] = mapped_column(String(50))
-    transaction_id: Mapped[str | None] = mapped_column(String(255))
+    payment_method: Mapped[Optional[str]] = mapped_column(String(50))
+    transaction_id: Mapped[Optional[str]] = mapped_column(String(255))
 
     status: Mapped[str] = mapped_column(String(50), default="active")
+    progress_percent: Mapped[int] = mapped_column(Integer, default=0)
+    last_accessed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     enrolled_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     student: Mapped["User"] = relationship("User", back_populates="enrollments")
     course: Mapped["Course"] = relationship("Course", back_populates="enrollments")

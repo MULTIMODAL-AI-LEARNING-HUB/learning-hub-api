@@ -10,6 +10,10 @@ from app.models.course_material import CourseMaterial
 from app.models.enrollment import Enrollment
 from app.models.material_progress import MaterialProgress
 from app.models.payment import Payment
+from app.models.course_content import (
+    Section, Lesson, Attachment, Quiz, Question, Answer,
+    QuizAttempt, Assignment, AssignmentSubmission, Discussion, Review
+)
 
 __all__ = [
     "User",
@@ -26,4 +30,15 @@ __all__ = [
     "Enrollment",
     "MaterialProgress",
     "Payment",
+    "Section",
+    "Lesson",
+    "Attachment",
+    "Quiz",
+    "Question",
+    "Answer",
+    "QuizAttempt",
+    "Assignment",
+    "AssignmentSubmission",
+    "Discussion",
+    "Review",
 ]

@@ -103,6 +103,7 @@ async def create_category(
         slug=payload.slug,
         description=payload.description,
         icon=payload.icon,
+        parent_id=payload.parent_id,
     )
     return _to_response(category)
 

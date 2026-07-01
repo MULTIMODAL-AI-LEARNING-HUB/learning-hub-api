@@ -56,6 +56,23 @@ from app.schemas.progress import (
     MaterialProgressResponse,
     MaterialProgressUpdate,
 )
+from app.schemas.admin import (
+    AdminUserCreate,
+    AdminUserUpdate,
+    AdminUserResponse,
+    AdminUserListResponse,
+    AdminCourseResponse,
+    AdminCourseListResponse,
+)
+
+from app.schemas.admin import (
+    AdminUserCreate,
+    AdminUserUpdate,
+    AdminUserResponse,
+    AdminUserListResponse,
+    AdminCourseResponse,
+    AdminCourseListResponse,
+)
 
 __all__ = [
     # Auth
@@ -108,4 +125,11 @@ __all__ = [
     "EnrollmentProgressResponse",
     "MaterialProgressResponse",
     "MaterialProgressUpdate",
+    # Admin
+    "AdminUserCreate",
+    "AdminUserUpdate",
+    "AdminUserResponse",
+    "AdminUserListResponse",
+    "AdminCourseResponse",
+    "AdminCourseListResponse",
 ]

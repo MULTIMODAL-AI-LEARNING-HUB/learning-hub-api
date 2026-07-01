@@ -130,3 +130,50 @@ class CourseRepository(BaseRepository):
     async def delete(self, course_id: UUID) -> None:
         await self.db.execute(delete(Course).where(Course.id == course_id))
         await self.db.commit()
+
+    async def list_all(
+        self,
+        offset: int = 0,
+        limit: int = 20,
+        search: str | None = None,
+        status: str | None = None,
+        lecturer_id: UUID | None = None,
+    ) -> list[Course]:
+        query = select(Course).options(selectinload(Course.lecturer), selectinload(Course.category))
+
+        if status:
+            query = query.where(Course.status == status)
+        if lecturer_id:
+            query = query.where(Course.lecturer_id == lecturer_id)
+        if search:
+            query = query.where(
+                or_(
+                    Course.title.ilike(f"%{search}%"),
+                    Course.description.ilike(f"%{search}%")
+                )
+            )
+
+        query = query.order_by(Course.created_at.desc()).offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def count_all(
+        self,
+        search: str | None = None,
+        status: str | None = None,
+        lecturer_id: UUID | None = None,
+    ) -> int:
+        query = select(func.count(Course.id))
+        if status:
+            query = query.where(Course.status == status)
+        if lecturer_id:
+            query = query.where(Course.lecturer_id == lecturer_id)
+        if search:
+            query = query.where(
+                or_(
+                    Course.title.ilike(f"%{search}%"),
+                    Course.description.ilike(f"%{search}%")
+                )
+            )
+        result = await self.db.execute(query)
+        return result.scalar() or 0

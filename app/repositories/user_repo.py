@@ -90,3 +90,17 @@ class UserRepository(BaseRepository):
             user.reset_token = None
             user.reset_token_expiry = None
             await self.db.commit()
+
+    async def update(self, user: User) -> User:
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    async def delete(self, user_id: UUID) -> None:
+        result = await self.db.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        if user:
+            await self.db.delete(user)
+            await self.db.commit()

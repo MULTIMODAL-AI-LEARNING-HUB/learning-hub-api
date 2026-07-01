@@ -1,22 +1,202 @@
 """Admin API endpoints."""
 
-from fastapi import APIRouter, Depends, Request
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.dependencies.auth import require_admin
 from app.dependencies.db import get_db
 from app.models.user import User
+from app.models.course import Course
 from app.models.document import Document
+from app.models.enrollment import Enrollment
 from app.repositories.user_repo import UserRepository
+from app.repositories.course_repo import CourseRepository
+from app.schemas.admin import (
+    AdminUserCreate,
+    AdminUserUpdate,
+    AdminUserResponse,
+    AdminUserListResponse,
+    AdminCourseResponse,
+    AdminCourseListResponse,
+)
 
-# Caching & limiters
 from app.core.limiter import limiter
 from app.core.config import settings
 from app.core.cache import RedisCache, get_redis_client
+from app.core.security import hash_password
 from app.clients.ai_client import get_ai_client
+from app.utils.pagination import build_pagination
 
 router = APIRouter()
+
+
+# ─── User Management ───────────────────────────────────────────
+
+@router.post("/users", response_model=AdminUserResponse, status_code=201)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def create_user(
+    payload: AdminUserCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Create a new user with any role. Admin only."""
+    repo = UserRepository(db)
+    existing = await repo.get_by_email(payload.email)
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    user = User(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name,
+        role=payload.role,
+    )
+    user = await repo.create(user)
+    return AdminUserResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+    )
+
+
+@router.put("/users/{user_id}", response_model=AdminUserResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def update_user(
+    user_id: UUID,
+    payload: AdminUserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Update a user's role or active status. Admin only."""
+    repo = UserRepository(db)
+    user = await repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if payload.role is not None:
+        user.role = payload.role
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.full_name is not None:
+        user.full_name = payload.full_name
+
+    user = await repo.update(user)
+    return AdminUserResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+    )
+
+
+@router.delete("/users/{user_id}", status_code=204)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def delete_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Delete a user. Admin only."""
+    if user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete yourself")
+
+    repo = UserRepository(db)
+    user = await repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    await repo.delete(user_id)
+
+
+# ─── Course Management ─────────────────────────────────────────
+
+@router.get("/courses", response_model=AdminCourseListResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_all_courses(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: str | None = None,
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """List all courses with optional filters. Admin only."""
+    repo = CourseRepository(db)
+    offset = (page - 1) * page_size
+
+    courses = await repo.list_all(
+        offset=offset,
+        limit=page_size,
+        search=search,
+        status=status,
+    )
+    total = await repo.count_all(search=search, status=status)
+
+    # Fetch enrollment counts per course
+    course_ids = [c.id for c in courses]
+    enrollment_counts = {}
+    if course_ids:
+        result = await db.execute(
+            select(Enrollment.course_id, func.count(Enrollment.id))
+            .where(Enrollment.course_id.in_(course_ids))
+            .group_by(Enrollment.course_id)
+        )
+        enrollment_counts = dict(result.all())
+
+    pagination = build_pagination(total, page, page_size)
+
+    return AdminCourseListResponse(
+        items=[
+            AdminCourseResponse(
+                id=c.id,
+                lecturer_id=c.lecturer_id,
+                category_id=c.category_id,
+                title=c.title,
+                description=c.description,
+                thumbnail_url=c.thumbnail_url,
+                price_vnd=c.price_vnd,
+                status=c.status,
+                level=c.level,
+                language=c.language,
+                created_at=c.created_at,
+                updated_at=c.updated_at,
+                lecturer_name=c.lecturer.full_name if c.lecturer else None,
+                category_name=c.category.name if c.category else None,
+                enrollment_count=enrollment_counts.get(c.id, 0),
+            )
+            for c in courses
+        ],
+        total=pagination["total"],
+        page=pagination["page"],
+        page_size=pagination["page_size"],
+    )
+
+
+@router.delete("/courses/{course_id}", status_code=204)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def delete_course(
+    course_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Delete any course. Admin only."""
+    repo = CourseRepository(db)
+    course = await repo.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    await repo.delete(course_id)
+
+
+# ─── Existing endpoints ────────────────────────────────────────
 
 
 @router.get("/users")

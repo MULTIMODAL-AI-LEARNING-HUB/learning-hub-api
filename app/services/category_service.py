@@ -10,12 +10,13 @@ class CategoryService:
     def __init__(self, repo: CategoryRepository):
         self.repo = repo
 
-    async def create(self, name: str, slug: str, description: str | None = None, icon: str | None = None) -> Category:
+    async def create(self, name: str, slug: str, description: str | None = None, icon: str | None = None, parent_id: UUID | None = None) -> Category:
         category = Category(
             name=name,
             slug=slug,
             description=description,
-            icon=icon
+            icon=icon,
+            parent_id=parent_id,
         )
         return await self.repo.create(category)
 

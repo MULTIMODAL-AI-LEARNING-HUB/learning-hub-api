@@ -45,7 +45,7 @@ def _to_tree_response(category) -> CategoryTreeResponse:
     )
 
 
-@router.get("/", response_model=list[CategoryResponse])
+@router.get("", response_model=list[CategoryResponse])
 async def list_categories(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -84,7 +84,7 @@ async def get_category(
     return _to_response(category)
 
 
-@router.post("/", response_model=CategoryResponse, status_code=201)
+@router.post("", response_model=CategoryResponse, status_code=201)
 async def create_category(
     payload: CategoryCreate,
     db: AsyncSession = Depends(get_db),

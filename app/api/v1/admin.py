@@ -303,6 +303,36 @@ async def health(
     except Exception:
         services["redis"] = "unhealthy"
 
+    # 4. Test Cloudflare R2 (S3-compatible) Storage
+    try:
+        from app.clients.minio_client import get_minio_client
+        mc = get_minio_client()
+        mc.bucket_exists(settings.MINIO_BUCKET_NAME)
+        services["s3_storage"] = "healthy"
+    except Exception:
+        services["s3_storage"] = "unhealthy"
+
+    # 5. Test Qdrant Vector Database
+    try:
+        from qdrant_client import QdrantClient
+        qdrant = QdrantClient(
+            url=settings.QDRANT_URL or f"http://{settings.QDRANT_HOST}:{settings.QDRANT_PORT}",
+            api_key=settings.QDRANT_API_KEY,
+        )
+        qdrant.get_collections()
+        services["qdrant"] = "healthy"
+    except Exception:
+        services["qdrant"] = "unhealthy"
+
+    # 6. Test Celery Worker
+    try:
+        from app.tasks.document_tasks import celery_app
+        insp = celery_app.control.inspect()
+        workers = insp.ping()
+        services["celery"] = "healthy" if workers else "degraded"
+    except Exception:
+        services["celery"] = "unhealthy"
+
     overall = "healthy" if all(v == "healthy" for v in services.values()) else "degraded"
 
     return {"status": overall, "services": services}

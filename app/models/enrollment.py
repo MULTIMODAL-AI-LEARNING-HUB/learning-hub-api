@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.course import Course
     from app.models.material_progress import MaterialProgress
+    from app.models.course_content import QuizAttempt, Review
 
 
 class Enrollment(Base):
@@ -32,3 +33,5 @@ class Enrollment(Base):
     student: Mapped["User"] = relationship("User", back_populates="enrollments")
     course: Mapped["Course"] = relationship("Course", back_populates="enrollments")
     progress: Mapped[list["MaterialProgress"]] = relationship("MaterialProgress", back_populates="enrollment", cascade="all, delete-orphan")
+    quiz_attempts: Mapped[list["QuizAttempt"]] = relationship("QuizAttempt", back_populates="enrollment", cascade="all, delete-orphan")
+    review: Mapped[Optional["Review"]] = relationship("Review", back_populates="enrollment", uselist=False, cascade="all, delete-orphan")

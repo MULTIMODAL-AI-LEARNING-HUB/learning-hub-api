@@ -38,6 +38,7 @@ router = APIRouter()
 @router.post("/users", response_model=AdminUserResponse, status_code=201)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def create_user(
+    request: Request,
     payload: AdminUserCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
@@ -68,6 +69,7 @@ async def create_user(
 @router.put("/users/{user_id}", response_model=AdminUserResponse)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def update_user(
+    request: Request,
     user_id: UUID,
     payload: AdminUserUpdate,
     db: AsyncSession = Depends(get_db),
@@ -100,6 +102,7 @@ async def update_user(
 @router.delete("/users/{user_id}", status_code=204)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def delete_user(
+    request: Request,
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
@@ -121,6 +124,7 @@ async def delete_user(
 @router.get("/courses", response_model=AdminCourseListResponse)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_all_courses(
+    request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     search: str | None = None,
@@ -183,6 +187,7 @@ async def list_all_courses(
 @router.delete("/courses/{course_id}", status_code=204)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def delete_course(
+    request: Request,
     course_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),

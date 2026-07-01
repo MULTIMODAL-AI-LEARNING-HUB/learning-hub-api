@@ -10,7 +10,7 @@ from app.core.database import get_db
 from app.models import Lesson, Quiz, Question, Answer, Course, Enrollment, QuizAttempt
 from app.schemas.course_content import (
     QuizCreate, QuizUpdate, QuizResponse, QuizWithQuestions,
-    QuestionCreate, QuestionUpdate, QuestionResponse, QuestionWithAnswers,
+    QuestionCreate, QuestionUpdate, QuestionResponse,
     AnswerCreate, AnswerUpdate, AnswerResponse,
     QuizAttemptSubmit, QuizAttemptResponse, QuizAttemptResult,
     ReorderQuestions

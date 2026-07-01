@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Section, Lesson, Course
+from app.models import Section, Course
 from app.schemas.course_content import (
     SectionCreate, SectionUpdate, SectionResponse, SectionWithLessons,
     ReorderSections
@@ -36,7 +36,7 @@ async def list_sections(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    course = await get_course_or_404(db, course_id)
+    await get_course_or_404(db, course_id)
     result = await db.execute(
         select(Section)
         .where(Section.course_id == course_id)
@@ -82,7 +82,7 @@ async def get_section(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    course = await get_course_or_404(db, course_id)
+    await get_course_or_404(db, course_id)
     result = await db.execute(
         select(Section)
         .where(Section.id == section_id, Section.course_id == course_id)

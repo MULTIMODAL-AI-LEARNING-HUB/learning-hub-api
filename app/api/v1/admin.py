@@ -9,7 +9,6 @@ from sqlalchemy import select, func
 from app.dependencies.auth import require_admin
 from app.dependencies.db import get_db
 from app.models.user import User
-from app.models.course import Course
 from app.models.document import Document
 from app.models.enrollment import Enrollment
 from app.repositories.user_repo import UserRepository
@@ -18,7 +17,6 @@ from app.schemas.admin import (
     AdminUserCreate,
     AdminUserUpdate,
     AdminUserResponse,
-    AdminUserListResponse,
     AdminCourseResponse,
     AdminCourseListResponse,
 )

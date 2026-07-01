@@ -65,15 +65,6 @@ from app.schemas.admin import (
     AdminCourseListResponse,
 )
 
-from app.schemas.admin import (
-    AdminUserCreate,
-    AdminUserUpdate,
-    AdminUserResponse,
-    AdminUserListResponse,
-    AdminCourseResponse,
-    AdminCourseListResponse,
-)
-
 __all__ = [
     # Auth
     "AuthResponse",

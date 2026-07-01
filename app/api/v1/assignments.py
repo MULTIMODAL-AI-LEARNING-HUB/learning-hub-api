@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.models import Lesson, Assignment, AssignmentSubmission, Course, Enrollment
 from app.schemas.course_content import (
-    AssignmentCreate, AssignmentUpdate, AssignmentResponse, AssignmentWithSubmissions,
+    AssignmentCreate, AssignmentUpdate, AssignmentResponse,
     SubmissionCreate, SubmissionGrade, SubmissionResponse
 )
 from app.dependencies.auth import get_current_user, require_lecturer, require_active_user

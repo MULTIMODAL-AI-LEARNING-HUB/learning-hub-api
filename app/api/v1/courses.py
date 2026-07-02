@@ -33,6 +33,7 @@ def _to_response(course) -> CourseResponse:
         description=course.description,
         thumbnail_url=course.thumbnail_url,
         price_vnd=course.price_vnd,
+        price=course.price_vnd,
         status=course.status,
         created_at=course.created_at,
         updated_at=course.updated_at,

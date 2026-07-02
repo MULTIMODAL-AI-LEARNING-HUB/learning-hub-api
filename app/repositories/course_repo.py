@@ -47,7 +47,7 @@ class CourseRepository(BaseRepository):
         sort_by: str = "created_at",
         sort_order: str = "desc"
     ) -> list[Course]:
-        query = select(Course).where(Course.status == "published")
+        query = select(Course).where(Course.status == "published").options(selectinload(Course.lecturer), selectinload(Course.category))
 
         if search:
             query = query.where(
@@ -110,6 +110,7 @@ class CourseRepository(BaseRepository):
         result = await self.db.execute(
             select(Course)
             .where(Course.lecturer_id == lecturer_id)
+            .options(selectinload(Course.lecturer), selectinload(Course.category))
             .order_by(Course.created_at.desc())
             .offset(offset)
             .limit(limit)

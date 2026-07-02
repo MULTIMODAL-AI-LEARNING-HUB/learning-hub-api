@@ -50,6 +50,7 @@ class CourseResponse(BaseModel):
     description: str | None = None
     thumbnail_url: str | None = None
     price_vnd: int
+    price: int
     status: str
     created_at: datetime
     updated_at: datetime

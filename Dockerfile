@@ -12,4 +12,6 @@ COPY . .
 
 ENV PYTHONUNBUFFERED=1
 
+RUN find /app/alembic -type d -name __pycache__ -exec rm -rf {} +
+
 CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT"]

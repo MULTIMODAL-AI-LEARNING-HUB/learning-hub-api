@@ -11,8 +11,9 @@ services:
       - QDRANT_HOST=qdrant
       - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
       - AI_SERVICE_URL=http://ai:8001
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=minio:9000
       - PORT=8000
       - DB_SSL_MODE=disable
     depends_on:

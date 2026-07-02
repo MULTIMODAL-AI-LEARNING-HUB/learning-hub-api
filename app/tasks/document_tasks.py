@@ -6,7 +6,7 @@ from app.core.config import settings
 
 celery_app = Celery(
     "learning_hub_api",
-    broker=settings.REDIS_URL,
+    broker=settings.CELERY_BROKER_URL,
     backend=settings.REDIS_URL,
 )
 

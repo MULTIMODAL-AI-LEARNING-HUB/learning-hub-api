@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_learning_hub"
     REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
     QDRANT_URL: str | None = None

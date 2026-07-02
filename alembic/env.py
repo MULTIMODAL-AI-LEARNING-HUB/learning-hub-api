@@ -15,7 +15,10 @@ sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
 from app.core.database import Base
 from app.models import (  # noqa: F401
-    User, Document, ChatSession, ChatMessage, Flashcard, FlashcardItem, EssaySubmission, Quota
+    User, Document, ChatSession, ChatMessage, Flashcard, FlashcardItem, EssaySubmission, Quota,
+    Category, Course, CourseMaterial, Enrollment, MaterialProgress, Payment,
+    Section, Lesson, Attachment, Quiz, Question, Answer,
+    QuizAttempt, Assignment, AssignmentSubmission, Discussion, Review,
 )
 from app.core.config import settings
 

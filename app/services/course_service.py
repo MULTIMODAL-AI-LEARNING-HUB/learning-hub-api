@@ -28,7 +28,8 @@ class CourseService:
             thumbnail_url=thumbnail_url,
             status="draft"
         )
-        return await self.repo.create(course)
+        created = await self.repo.create(course)
+        return await self.repo.get_by_id(created.id)
 
     async def get_by_id(self, course_id: UUID) -> Course | None:
         return await self.repo.get_by_id(course_id)

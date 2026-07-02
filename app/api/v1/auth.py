@@ -20,6 +20,7 @@ from app.schemas import (
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
+    UpdateProfileRequest,
 )
 from app.services.auth_service import AuthService
 
@@ -126,6 +127,24 @@ async def me(current_user: User = Depends(get_current_user)) -> AuthUserResponse
     response = _build_user_response(current_user)
     await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_PROFILE)
     return response
+
+
+@router.put("/me", response_model=AuthUserResponse)
+async def update_me(
+    payload: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AuthUserResponse:
+    """Update current authenticated user's profile."""
+    repo = UserRepository(db)
+    updated = await repo.update_profile(current_user.id, full_name=payload.full_name, avatar_url=payload.avatar_url)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    cache = RedisCache()
+    await cache.delete(RedisCache.cache_key_profile(current_user.id))
+
+    return _build_user_response(updated)
 
 
 @router.post("/forgot-password", response_model=MessageResponse)

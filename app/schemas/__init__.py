@@ -8,6 +8,7 @@ from app.schemas.auth import (
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
+    UpdateProfileRequest,
 )
 from app.schemas.documents import (
     DocumentListResponse,
@@ -76,6 +77,7 @@ __all__ = [
     "RegisterRequest",
     "ResetPasswordRequest",
     "TokenResponse",
+    "UpdateProfileRequest",
     # Documents
     "DocumentListResponse",
     "DocumentResponse",

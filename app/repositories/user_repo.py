@@ -96,6 +96,21 @@ class UserRepository(BaseRepository):
         await self.db.refresh(user)
         return user
 
+    async def update_profile(self, user_id: UUID, full_name: str | None = None, avatar_url: str | None = None) -> User | None:
+        result = await self.db.execute(
+            select(User).where(User.id == user_id).options(selectinload(User.quota))
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            return None
+        if full_name is not None:
+            user.full_name = full_name
+        if avatar_url is not None:
+            user.avatar_url = avatar_url
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
     async def delete(self, user_id: UUID) -> None:
         result = await self.db.execute(
             select(User).where(User.id == user_id)

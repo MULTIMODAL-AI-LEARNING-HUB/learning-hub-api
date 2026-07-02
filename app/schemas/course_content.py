@@ -159,6 +159,31 @@ class QuizWithQuestions(QuizResponse):
     questions: List["QuestionWithAnswers"] = []
 
 
+# ============ ANSWER SCHEMAS ============
+
+class AnswerCreate(BaseModel):
+    answer_text: str = Field(..., min_length=1)
+    is_correct: bool = False
+    order_index: int = 0
+
+
+class AnswerUpdate(BaseModel):
+    answer_text: Optional[str] = None
+    is_correct: Optional[bool] = None
+
+
+class AnswerResponse(BaseModel):
+    id: UUID
+    question_id: UUID
+    answer_text: str
+    is_correct: bool
+    order_index: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ============ QUESTION SCHEMAS ============
 
 class QuestionCreate(BaseModel):
@@ -193,31 +218,6 @@ class QuestionResponse(BaseModel):
 
 class QuestionWithAnswers(QuestionResponse):
     answers: List["AnswerResponse"] = []
-
-
-# ============ ANSWER SCHEMAS ============
-
-class AnswerCreate(BaseModel):
-    answer_text: str = Field(..., min_length=1)
-    is_correct: bool = False
-    order_index: int = 0
-
-
-class AnswerUpdate(BaseModel):
-    answer_text: Optional[str] = None
-    is_correct: Optional[bool] = None
-
-
-class AnswerResponse(BaseModel):
-    id: UUID
-    question_id: UUID
-    answer_text: str
-    is_correct: bool
-    order_index: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ============ QUIZ ATTEMPT SCHEMAS ============

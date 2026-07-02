@@ -36,6 +36,7 @@ def _to_response(material: CourseMaterial) -> CourseMaterialResponse:
         course_id=material.course_id,
         lecturer_id=material.lecturer_id,
         file_name=material.file_name,
+        title=material.file_name,
         file_type=material.file_type,
         file_url=file_url,
         file_size=material.file_size,

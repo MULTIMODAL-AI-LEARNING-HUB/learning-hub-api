@@ -52,6 +52,7 @@ class LessonCreate(BaseModel):
     description: Optional[str] = None
     type: str = "ARTICLE"
     video_url: Optional[str] = None
+    video_duration: Optional[int] = None
     content: Optional[str] = None
     order_index: int = 0
     is_preview: bool = False
@@ -62,6 +63,7 @@ class LessonUpdate(BaseModel):
     description: Optional[str] = None
     type: Optional[str] = None
     video_url: Optional[str] = None
+    video_duration: Optional[int] = None
     content: Optional[str] = None
     is_preview: Optional[bool] = None
     is_active: Optional[bool] = None
@@ -165,6 +167,7 @@ class QuestionCreate(BaseModel):
     points: int = Field(default=1, ge=1)
     explanation: Optional[str] = None
     order_index: int = 0
+    answers: List[AnswerCreate] = []
 
 
 class QuestionUpdate(BaseModel):
@@ -266,6 +269,7 @@ class AssignmentUpdate(BaseModel):
     max_score: Optional[int] = None
     allow_resubmit: Optional[bool] = None
     max_resubmits: Optional[int] = None
+    is_active: Optional[bool] = None
 
 
 class AssignmentResponse(BaseModel):

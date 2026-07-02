@@ -25,6 +25,7 @@ class CourseMaterialResponse(BaseModel):
     course_id: UUID
     lecturer_id: UUID
     file_name: str | None = None
+    title: str | None = None
     file_type: str
     file_url: str | None = None
     file_size: int | None = None

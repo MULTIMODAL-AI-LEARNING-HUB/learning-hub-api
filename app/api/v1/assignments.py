@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Lesson, Assignment, AssignmentSubmission, Course, Enrollment
+from app.models import Lesson, Section, Assignment, AssignmentSubmission, Course, Enrollment
 from app.schemas.course_content import (
     AssignmentCreate, AssignmentUpdate, AssignmentResponse,
     SubmissionCreate, SubmissionGrade, SubmissionResponse
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/lessons/{lesson_id}/assignment", tags=["Assignments"
 
 async def get_lesson_with_course(db: AsyncSession, lesson_id: UUID) -> tuple[Lesson, Course]:
     result = await db.execute(
-        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Lesson.course))
+        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Section.course))
     )
     lesson = result.scalar_one_or_none()
     if not lesson:

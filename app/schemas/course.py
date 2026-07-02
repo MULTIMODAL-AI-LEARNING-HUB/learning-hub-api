@@ -8,7 +8,7 @@ class CourseBase(BaseModel):
     title: str = Field(max_length=255)
     description: str | None = None
     category_id: UUID | None = None
-    price_vnd: int = Field(default=0, ge=0)
+    price_vnd: int = Field(default=0, ge=0, validation_alias="price")
     thumbnail_url: str | None = None
 
 
@@ -20,7 +20,7 @@ class CourseUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=255)
     description: str | None = None
     category_id: UUID | None = None
-    price_vnd: int | None = Field(default=None, ge=0)
+    price_vnd: int | None = Field(default=None, ge=0, validation_alias="price")
     thumbnail_url: str | None = None
 
 
@@ -52,6 +52,15 @@ class CourseResponse(BaseModel):
     price_vnd: int
     price: int
     status: str
+    level: str = "beginner"
+    language: str = "en"
+    requirements: str | None = None
+    learning_outcomes: str | None = None
+    tags: str | None = None
+    view_count: int = 0
+    rating_avg: float = 0
+    rating_count: int = 0
+    enrollment_count: int = 0
     created_at: datetime
     updated_at: datetime
     lecturer: LecturerResponse | None = None

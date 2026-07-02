@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Lesson, Quiz, Question, Answer, Course, Enrollment, QuizAttempt
+from app.models import Lesson, Section, Quiz, Question, Answer, Course, Enrollment, QuizAttempt
 from app.schemas.course_content import (
     QuizCreate, QuizUpdate, QuizResponse, QuizWithQuestions,
     QuestionCreate, QuestionUpdate, QuestionResponse,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/lessons/{lesson_id}/quiz", tags=["Quizzes"])
 
 async def get_lesson_with_course(db: AsyncSession, lesson_id: UUID) -> tuple[Lesson, Course]:
     result = await db.execute(
-        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Lesson.course))
+        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Section.course))
     )
     lesson = result.scalar_one_or_none()
     if not lesson:
@@ -152,6 +152,17 @@ async def create_question(
         order_index=question_data.order_index
     )
     db.add(question)
+    await db.flush()
+
+    for idx, answer_data in enumerate(question_data.answers):
+        answer = Answer(
+            question_id=question.id,
+            answer_text=answer_data.answer_text,
+            is_correct=answer_data.is_correct,
+            order_index=answer_data.order_index or idx
+        )
+        db.add(answer)
+
     await db.commit()
     await db.refresh(question)
     return question

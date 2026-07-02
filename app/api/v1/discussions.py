@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Lesson, Discussion, Course
+from app.models import Lesson, Section, Discussion, Course
 from app.schemas.course_content import DiscussionCreate, DiscussionUpdate, DiscussionResponse
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/lessons/{lesson_id}/discussions", tags=["Discussions
 
 async def get_lesson_with_course(db: AsyncSession, lesson_id: UUID) -> tuple[Lesson, Course]:
     result = await db.execute(
-        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Lesson.course))
+        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Section.course))
     )
     lesson = result.scalar_one_or_none()
     if not lesson:

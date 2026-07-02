@@ -24,6 +24,8 @@ from app.schemas import (
 from app.services.course_service import CourseService
 from app.services.enrollment_service import EnrollmentService
 from app.services.payment_gateway_service import get_vnpay_service, get_momo_service
+from app.core.cache import RedisCache
+from app.core.config import settings
 
 router = APIRouter(tags=["enrollments"])
 
@@ -98,6 +100,7 @@ async def create_payment_intent(
             amount_vnd=0,
         )
         await enrollment_service.confirm_payment(transaction_id, "completed")
+        await RedisCache().delete(f"cache:enrollments:{current_user.id}")
         return PaymentIntentResponse(
             payment_url="",
             transaction_id=transaction_id,
@@ -173,6 +176,7 @@ async def confirm_payment(
     if not enrollment:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment confirmation failed")
 
+    await RedisCache().delete(f"cache:enrollments:{current_user.id}")
     return _to_response(enrollment)
 
 
@@ -200,13 +204,23 @@ async def list_my_enrollments(
     current_user: User = Depends(get_current_user),
 ) -> EnrollmentListResponse:
     """List current user's enrollments."""
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_enrollments(current_user.id)
+    if not status_filter:
+        cached = await cache.get(cache_key)
+        if cached:
+            return EnrollmentListResponse(**cached)
+
     enrollment_repo = EnrollmentRepository(db)
     enrollments = await enrollment_repo.list_by_student(current_user.id, status_filter)
 
-    return EnrollmentListResponse(
+    response = EnrollmentListResponse(
         items=[_to_enrollment_with_course(e) for e in enrollments],
         total=len(enrollments),
     )
+    if not status_filter:
+        await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_ENROLLMENTS)
+    return response
 
 
 @router.get("/courses/{course_id}/enrolled-students", response_model=EnrollmentListResponse)

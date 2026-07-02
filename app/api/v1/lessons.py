@@ -13,6 +13,8 @@ from app.schemas.course_content import (
 )
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.models.user import User
+from app.core.cache import RedisCache
+from app.core.config import settings
 
 router = APIRouter(prefix="/sections/{section_id}/lessons", tags=["Lessons"])
 
@@ -106,6 +108,7 @@ async def create_lesson(
     db.add(lesson)
     await db.commit()
     await db.refresh(lesson)
+    await RedisCache().delete(f"cache:lessons:{lesson.id}")
     return lesson
 
 
@@ -116,6 +119,12 @@ async def get_lesson(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_lesson(lesson_id)
+    cached = await cache.get(cache_key)
+    if cached:
+        return LessonWithContent(**cached)
+
     section, course = await get_section_with_course(db, section_id)
 
     result = await db.execute(
@@ -130,6 +139,10 @@ async def get_lesson(
     lesson = result.scalar_one_or_none()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
+
+    from fastapi.encoders import jsonable_encoder
+    lesson_data = jsonable_encoder(lesson)
+    await cache.set(cache_key, lesson_data, ttl=settings.REDIS_CACHE_TTL_LESSONS)
     return lesson
 
 
@@ -156,6 +169,7 @@ async def update_lesson(
 
     await db.commit()
     await db.refresh(lesson)
+    await RedisCache().delete(f"cache:lessons:{lesson.id}")
     return lesson
 
 
@@ -178,6 +192,7 @@ async def delete_lesson(
 
     await db.delete(lesson)
     await db.commit()
+    await RedisCache().delete(f"cache:lessons:{lesson_id}")
 
 
 @router.put("/{lesson_id}/reorder", response_model=List[LessonResponse])
@@ -200,6 +215,7 @@ async def reorder_lessons(
             lesson.order_index = idx
 
     await db.commit()
+    await RedisCache().delete_pattern("cache:lessons:*")
 
     result = await db.execute(
         select(Lesson).where(Lesson.section_id == section_id).order_by(Lesson.order_index)

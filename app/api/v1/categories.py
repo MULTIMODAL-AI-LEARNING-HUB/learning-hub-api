@@ -16,6 +16,8 @@ from app.schemas import (
     CategoryUpdate,
 )
 from app.services.category_service import CategoryService
+from app.core.cache import RedisCache
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -63,10 +65,18 @@ async def get_category_tree(
     current_user: User = Depends(get_current_user),
 ) -> list[CategoryTreeResponse]:
     """Get category tree structure."""
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_categories_tree()
+    cached = await cache.get(cache_key)
+    if cached:
+        return [CategoryTreeResponse(**c) for c in cached]
+
     repo = CategoryRepository(db)
     service = CategoryService(repo)
     categories = await service.get_tree()
-    return [_to_tree_response(c) for c in categories]
+    response = [_to_tree_response(c) for c in categories]
+    await cache.set(cache_key, [r.model_dump(mode="json") for r in response], ttl=settings.REDIS_CACHE_TTL_CATEGORIES)
+    return response
 
 
 @router.get("/{category_id}", response_model=CategoryResponse)
@@ -105,6 +115,7 @@ async def create_category(
         icon=payload.icon,
         parent_id=payload.parent_id,
     )
+    await RedisCache().delete_pattern("cache:categories:*")
     return _to_response(category)
 
 
@@ -127,6 +138,7 @@ async def update_category(
     )
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    await RedisCache().delete_pattern("cache:categories:*")
     return _to_response(category)
 
 
@@ -140,3 +152,4 @@ async def delete_category(
     repo = CategoryRepository(db)
     service = CategoryService(repo)
     await service.delete(category_id)
+    await RedisCache().delete_pattern("cache:categories:*")

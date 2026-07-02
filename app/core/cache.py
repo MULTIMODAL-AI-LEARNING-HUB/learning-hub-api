@@ -93,3 +93,27 @@ class RedisCache:
     @staticmethod
     def cache_key_quiz_job(job_id: Any) -> str:
         return f"cache:quiz_job:{job_id}"
+
+    @staticmethod
+    def cache_key_courses_list(page: int, page_size: int, search: str | None, category_id: Any, min_price: int | None, max_price: int | None, sort_by: str, sort_order: str) -> str:
+        return f"cache:courses:l:{page}:{page_size}:s:{search or ''}:c:{category_id or ''}:min:{min_price or ''}:max:{max_price or ''}:sb:{sort_by}:so:{sort_order}"
+
+    @staticmethod
+    def cache_key_course_detail(course_id: Any) -> str:
+        return f"cache:courses:d:{course_id}"
+
+    @staticmethod
+    def cache_key_categories_tree() -> str:
+        return "cache:categories:tree"
+
+    @staticmethod
+    def cache_key_enrollments(user_id: Any) -> str:
+        return f"cache:enrollments:{user_id}"
+
+    @staticmethod
+    def cache_key_announcements(course_id: Any) -> str:
+        return f"cache:announcements:{course_id}"
+
+    @staticmethod
+    def cache_key_lesson(lesson_id: Any) -> str:
+        return f"cache:lessons:{lesson_id}"

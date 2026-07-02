@@ -8,6 +8,8 @@ from app.core.database import get_db
 from app.models import Announcement, Course, User
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
 from app.dependencies.auth import get_current_user
+from app.core.cache import RedisCache
+from app.core.config import settings
 
 router = APIRouter(prefix="/courses/{course_id}/announcements", tags=["announcements"])
 
@@ -26,6 +28,12 @@ async def list_announcements(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_announcements(course_id)
+    cached = await cache.get(cache_key)
+    if cached:
+        return [AnnouncementResponse(**a) for a in cached]
+
     await get_course_or_404(db, course_id)
     query = (
         select(Announcement)
@@ -49,6 +57,7 @@ async def list_announcements(
             created_at=a.created_at,
             updated_at=a.updated_at,
         ))
+    await cache.set(cache_key, [r.model_dump(mode="json") for r in response], ttl=settings.REDIS_CACHE_TTL_ANNOUNCEMENTS)
     return response
 
 
@@ -73,6 +82,7 @@ async def create_announcement(
     await db.commit()
     await db.refresh(announcement)
 
+    await RedisCache().delete_pattern(f"cache:announcements:{course_id}")
     return AnnouncementResponse(
         id=announcement.id,
         course_id=announcement.course_id,
@@ -114,6 +124,7 @@ async def update_announcement(
     user_result = await db.execute(select(User).where(User.id == announcement.lecturer_id))
     lecturer = user_result.scalar_one_or_none()
 
+    await RedisCache().delete_pattern(f"cache:announcements:{course_id}")
     return AnnouncementResponse(
         id=announcement.id,
         course_id=announcement.course_id,
@@ -145,3 +156,4 @@ async def delete_announcement(
 
     await db.delete(announcement)
     await db.commit()
+    await RedisCache().delete_pattern(f"cache:announcements:{course_id}")

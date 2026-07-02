@@ -25,6 +25,7 @@ from app.services.auth_service import AuthService
 
 from app.core.limiter import limiter
 from app.core.config import settings
+from app.core.cache import RedisCache
 
 router = APIRouter()
 
@@ -116,7 +117,15 @@ async def refresh(
 @router.get("/me", response_model=AuthUserResponse)
 async def me(current_user: User = Depends(get_current_user)) -> AuthUserResponse:
     """Get current authenticated user profile details."""
-    return _build_user_response(current_user)
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_profile(current_user.id)
+    cached = await cache.get(cache_key)
+    if cached:
+        return AuthUserResponse(**cached)
+
+    response = _build_user_response(current_user)
+    await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_PROFILE)
+    return response
 
 
 @router.post("/forgot-password", response_model=MessageResponse)

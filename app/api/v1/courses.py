@@ -20,6 +20,8 @@ from app.schemas import (
 )
 from app.services.course_service import CourseService
 from app.utils.pagination import build_pagination
+from app.core.cache import RedisCache
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -65,6 +67,12 @@ async def list_courses(
     current_user: User = Depends(get_current_user),
 ) -> CourseListResponse:
     """List published courses with search and filters."""
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_courses_list(page, page_size, search, category_id, min_price, max_price, sort_by, sort_order)
+    cached = await cache.get(cache_key)
+    if cached:
+        return CourseListResponse(**cached)
+
     repo = CourseRepository(db)
     service = CourseService(repo)
 
@@ -81,12 +89,14 @@ async def list_courses(
 
     pagination = build_pagination(total, page, page_size)
 
-    return CourseListResponse(
+    response = CourseListResponse(
         items=[_to_response(c) for c in courses],
         total=pagination["total"],
         page=pagination["page"],
         page_size=pagination["page_size"],
     )
+    await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_COURSES)
+    return response
 
 
 @router.get("/lecturer", response_model=CourseListResponse)
@@ -123,6 +133,12 @@ async def get_course(
     current_user: User = Depends(get_current_user),
 ) -> CourseDetailResponse:
     """Get course details with materials and enrollment counts."""
+    cache = RedisCache()
+    cache_key = RedisCache.cache_key_course_detail(course_id)
+    cached = await cache.get(cache_key)
+    if cached:
+        return CourseDetailResponse(**cached)
+
     repo = CourseRepository(db)
     service = CourseService(repo)
 
@@ -136,7 +152,7 @@ async def get_course(
     materials_count = await material_repo.count_by_course(course_id)
     enrolled_count = await enrollment_repo.count_by_course(course_id)
 
-    return CourseDetailResponse(
+    response = CourseDetailResponse(
         id=course.id,
         lecturer_id=course.lecturer_id,
         category_id=course.category_id,
@@ -152,6 +168,8 @@ async def get_course(
         materials_count=materials_count,
         enrolled_count=enrolled_count,
     )
+    await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_COURSES)
+    return response
 
 
 @router.post("", response_model=CourseResponse, status_code=201)
@@ -172,6 +190,7 @@ async def create_course(
         price_vnd=payload.price_vnd,
         thumbnail_url=payload.thumbnail_url,
     )
+    await RedisCache().delete_pattern("cache:courses:*")
     return _to_response(course)
 
 
@@ -201,6 +220,7 @@ async def update_course(
         price_vnd=payload.price_vnd,
         thumbnail_url=payload.thumbnail_url,
     )
+    await RedisCache().delete_pattern("cache:courses:*")
     return _to_response(updated)
 
 
@@ -222,6 +242,7 @@ async def publish_course(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     updated = await service.publish(course_id)
+    await RedisCache().delete_pattern("cache:courses:*")
     return _to_response(updated)
 
 
@@ -243,6 +264,7 @@ async def archive_course(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     updated = await service.archive(course_id)
+    await RedisCache().delete_pattern("cache:courses:*")
     return _to_response(updated)
 
 
@@ -264,3 +286,4 @@ async def delete_course(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     await service.delete(course_id)
+    await RedisCache().delete_pattern("cache:courses:*")

@@ -14,7 +14,7 @@ engine = create_async_engine(
     pool_recycle=settings.DB_POOL_RECYCLE,
     pool_pre_ping=settings.DB_POOL_PRE_PING,
     pool_timeout=30,
-    connect_args={"command_timeout": 60, "ssl": "require"},
+    connect_args={"command_timeout": 60, "ssl": settings.DB_SSL_MODE},
 )
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

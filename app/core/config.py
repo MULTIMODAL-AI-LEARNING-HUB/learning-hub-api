@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+    DB_SSL_MODE: str = "require"
 
     REDIS_CACHE_TTL_DOCS: int = 60
     REDIS_CACHE_TTL_PROFILE: int = 300

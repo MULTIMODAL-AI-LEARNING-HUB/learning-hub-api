@@ -8,6 +8,9 @@ from app.api.v1.quizzes import router as quizzes_router
 from app.api.v1.assignments import router as assignments_router
 from app.api.v1.discussions import router as discussions_router
 from app.api.v1.reviews import router as reviews_router
+from app.api.v1.notifications import router as notifications_router
+from app.api.v1.wishlist import router as wishlist_router
+from app.api.v1.announcements import router as announcements_router
 from app.webhooks.payment_webhooks import router as payment_webhooks_router
 
 api_router = APIRouter()
@@ -28,4 +31,7 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(study.router, prefix="/study", tags=["study"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(wishlist_router, prefix="/wishlist", tags=["wishlist"])
+api_router.include_router(announcements_router, prefix="/courses")
 api_router.include_router(payment_webhooks_router)

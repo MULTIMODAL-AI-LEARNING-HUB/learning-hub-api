@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.enrollment import Enrollment
     from app.models.chat import ChatSession
     from app.models.course_content import Section
+    from app.models.announcement import Announcement
 
 
 class Course(Base):
@@ -42,3 +43,4 @@ class Course(Base):
     enrollments: Mapped[list["Enrollment"]] = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
     chat_sessions: Mapped[list["ChatSession"]] = relationship("ChatSession", back_populates="course")
     sections: Mapped[list["Section"]] = relationship("Section", back_populates="course", cascade="all, delete-orphan", order_by="Section.order_index")
+    announcements: Mapped[list["Announcement"]] = relationship("Announcement", back_populates="course", cascade="all, delete-orphan")

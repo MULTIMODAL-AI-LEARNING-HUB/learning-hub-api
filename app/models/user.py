@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.course import Course
     from app.models.enrollment import Enrollment
     from app.models.course_content import AssignmentSubmission, Discussion
+    from app.models.notification import Notification
 
 class User(Base):
     __tablename__ = "users"
@@ -40,3 +41,4 @@ class User(Base):
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student", cascade="all, delete-orphan")
     assignment_submissions: Mapped[list["AssignmentSubmission"]] = relationship(back_populates="student", cascade="all, delete-orphan")
     discussions: Mapped[list["Discussion"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    notifications: Mapped[list["Notification"]] = relationship(back_populates="user", cascade="all, delete-orphan")

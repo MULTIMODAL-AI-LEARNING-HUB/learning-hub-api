@@ -14,6 +14,9 @@ from app.models.course_content import (
     Section, Lesson, Attachment, Quiz, Question, Answer,
     QuizAttempt, Assignment, AssignmentSubmission, Discussion, Review
 )
+from app.models.notification import Notification
+from app.models.wishlist import WishlistItem
+from app.models.announcement import Announcement
 
 __all__ = [
     "User",
@@ -41,4 +44,7 @@ __all__ = [
     "AssignmentSubmission",
     "Discussion",
     "Review",
+    "Notification",
+    "WishlistItem",
+    "Announcement",
 ]

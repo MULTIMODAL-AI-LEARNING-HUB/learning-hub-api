@@ -3,12 +3,11 @@ from uuid import UUID
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models import Announcement, Course, User
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
-from app.dependencies.auth import get_current_user, require_lecturer
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/courses/{course_id}/announcements", tags=["announcements"])
 

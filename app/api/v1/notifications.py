@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete as sa_delete
+from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.models import Notification
@@ -26,7 +26,7 @@ async def list_notifications(
     total = total_result.scalar() or 0
 
     unread_query = select(func.count(Notification.id)).where(
-        Notification.user_id == current_user.id, Notification.is_read == False
+        Notification.user_id == current_user.id, not Notification.is_read
     )
     unread_result = await db.execute(unread_query)
     unread_count = unread_result.scalar() or 0
@@ -72,11 +72,8 @@ async def mark_all_as_read(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await db.execute(
-        select(Notification).where(Notification.user_id == current_user.id, Notification.is_read == False)
-    )
     result = await db.execute(
-        select(Notification).where(Notification.user_id == current_user.id, Notification.is_read == False)
+        select(Notification).where(Notification.user_id == current_user.id, not Notification.is_read)
     )
     notifications = result.scalars().all()
     for n in notifications:

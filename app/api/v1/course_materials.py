@@ -49,7 +49,7 @@ def _to_response(material: CourseMaterial) -> CourseMaterialResponse:
     )
 
 
-@router.get("/", response_model=CourseMaterialListResponse)
+@router.get("", response_model=CourseMaterialListResponse)
 async def list_materials(
     course_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -72,7 +72,7 @@ async def list_materials(
     )
 
 
-@router.post("/", response_model=CourseMaterialResponse, status_code=201)
+@router.post("", response_model=CourseMaterialResponse, status_code=201)
 async def upload_material(
     course_id: UUID,
     file: UploadFile = File(...),

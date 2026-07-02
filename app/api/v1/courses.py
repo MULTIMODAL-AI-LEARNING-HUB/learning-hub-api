@@ -41,7 +41,7 @@ def _to_response(course) -> CourseResponse:
     )
 
 
-@router.get("/", response_model=CourseListResponse)
+@router.get("", response_model=CourseListResponse)
 async def list_courses(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -144,7 +144,7 @@ async def get_course(
     )
 
 
-@router.post("/", response_model=CourseResponse, status_code=201)
+@router.post("", response_model=CourseResponse, status_code=201)
 async def create_course(
     payload: CourseCreate,
     db: AsyncSession = Depends(get_db),

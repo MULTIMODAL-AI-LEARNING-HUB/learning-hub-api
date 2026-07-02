@@ -13,6 +13,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - AI_SERVICE_URL=http://ai:8001
       - MINIO_ENDPOINT=http://minio:9000
+      - PORT=8000
     depends_on:
       db:
         condition: service_healthy

@@ -9,7 +9,7 @@ from app.schemas.notification import NotificationResponse, NotificationListRespo
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 
-router = APIRouter(prefix="/notifications", tags=["notifications"])
+router = APIRouter(tags=["notifications"])
 
 
 @router.get("", response_model=NotificationListResponse)

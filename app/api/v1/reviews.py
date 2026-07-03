@@ -11,7 +11,7 @@ from app.schemas.course_content import ReviewCreate, ReviewUpdate, ReviewRespons
 from app.dependencies.auth import get_current_user, require_lecturer, require_active_user
 from app.models.user import User
 
-router = APIRouter(prefix="/courses/{course_id}/reviews", tags=["Reviews"])
+router = APIRouter(prefix="/{course_id}/reviews", tags=["Reviews"])
 
 
 async def get_course_or_404(db: AsyncSession, course_id: UUID) -> Course:

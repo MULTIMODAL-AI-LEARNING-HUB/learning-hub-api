@@ -6,6 +6,7 @@ from sqlalchemy import select, delete, func, and_
 from sqlalchemy.orm import selectinload
 
 from app.models.enrollment import Enrollment
+from app.models.course import Course
 from app.repositories.base import BaseRepository
 
 
@@ -40,7 +41,9 @@ class EnrollmentRepository(BaseRepository):
         query = select(Enrollment).where(Enrollment.student_id == student_id)
         if status:
             query = query.where(Enrollment.status == status)
-        query = query.options(selectinload(Enrollment.course)).order_by(Enrollment.enrolled_at.desc())
+        query = query.options(
+            selectinload(Enrollment.course).selectinload(Course.lecturer)
+        ).order_by(Enrollment.enrolled_at.desc())
         result = await self.db.execute(query)
         return list(result.scalars().all())
 

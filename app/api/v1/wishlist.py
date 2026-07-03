@@ -10,7 +10,7 @@ from app.schemas.wishlist import WishlistItemResponse
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 
-router = APIRouter(prefix="/wishlist", tags=["wishlist"])
+router = APIRouter(tags=["wishlist"])
 
 
 @router.get("", response_model=list[WishlistItemResponse])

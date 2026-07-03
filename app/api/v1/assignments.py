@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
 from uuid import UUID
 from typing import List
-from datetime import datetime
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -222,7 +224,7 @@ async def get_my_submissions(
             "student_id": s.student_id,
             "student_name": student.full_name if student else None,
             "submission_text": s.submission_text,
-            "attachments": eval(s.attachments) if s.attachments else [],
+            "attachments": json.loads(s.attachments) if s.attachments else [],
             "score": s.score,
             "feedback": s.feedback,
             "submitted_at": s.submitted_at,
@@ -264,7 +266,7 @@ async def get_all_submissions(
             "student_id": s.student_id,
             "student_name": student.full_name if student else None,
             "submission_text": s.submission_text,
-            "attachments": eval(s.attachments) if s.attachments else [],
+            "attachments": json.loads(s.attachments) if s.attachments else [],
             "score": s.score,
             "feedback": s.feedback,
             "submitted_at": s.submitted_at,

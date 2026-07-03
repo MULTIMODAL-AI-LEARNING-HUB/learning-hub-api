@@ -13,7 +13,6 @@ from app.schemas.dashboard import (
     DashboardResponse,
     DashboardCourseProgress,
     DashboardStats,
-    DashboardActivity,
 )
 from app.services.progress_service import ProgressService
 

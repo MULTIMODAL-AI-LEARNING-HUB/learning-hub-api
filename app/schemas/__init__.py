@@ -65,6 +65,12 @@ from app.schemas.admin import (
     AdminCourseResponse,
     AdminCourseListResponse,
 )
+from app.schemas.dashboard import (
+    DashboardResponse,
+    DashboardCourseProgress,
+    DashboardStats,
+    DashboardActivity,
+)
 
 __all__ = [
     # Auth
@@ -125,4 +131,9 @@ __all__ = [
     "AdminUserListResponse",
     "AdminCourseResponse",
     "AdminCourseListResponse",
+    # Dashboard
+    "DashboardResponse",
+    "DashboardCourseProgress",
+    "DashboardStats",
+    "DashboardActivity",
 ]

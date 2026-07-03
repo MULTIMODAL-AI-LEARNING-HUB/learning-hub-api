@@ -11,6 +11,7 @@ from app.api.v1.reviews import router as reviews_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.wishlist import router as wishlist_router
 from app.api.v1.announcements import router as announcements_router
+from app.api.v1.dashboard import router as dashboard_router
 from app.webhooks.payment_webhooks import router as payment_webhooks_router
 
 api_router = APIRouter()
@@ -24,7 +25,7 @@ api_router.include_router(lessons_router)
 api_router.include_router(quizzes_router, tags=["Quizzes"])
 api_router.include_router(assignments_router, tags=["Assignments"])
 api_router.include_router(discussions_router, tags=["Discussions"])
-api_router.include_router(reviews_router, prefix="/courses", tags=["reviews"])
+api_router.include_router(reviews.router, prefix="/courses", tags=["reviews"])
 api_router.include_router(enrollments.router, tags=["enrollments"])
 api_router.include_router(progress.router, tags=["progress"])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
@@ -34,4 +35,5 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(wishlist_router, prefix="/wishlist", tags=["wishlist"])
 api_router.include_router(announcements_router, tags=["announcements"])
+api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(payment_webhooks_router)

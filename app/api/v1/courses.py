@@ -126,6 +126,85 @@ async def list_my_courses(
     )
 
 
+@router.get("/stats")
+async def get_lecturer_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_lecturer),
+):
+    """Retrieve statistics for the lecturer's dashboard."""
+    from sqlalchemy import select
+    from app.models.course import Course
+    from app.models.enrollment import Enrollment
+
+    # Get lecturer's courses
+    courses_query = select(Course).where(Course.lecturer_id == current_user.id)
+    courses_result = await db.execute(courses_query)
+    courses = list(courses_result.scalars().all())
+
+    total_courses = len(courses)
+    if total_courses == 0:
+        return {
+            "total_courses": 0,
+            "total_students": 0,
+            "total_revenue": 0,
+            "avg_rating": 0.0,
+            "recent_enrollments": [],
+            "course_stats": []
+        }
+
+    course_ids = [c.id for c in courses]
+
+    # Calculate average rating of courses
+    valid_ratings = [c.rating_avg for c in courses if c.rating_avg]
+    avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
+
+    # Get all enrollments for these courses
+    enrollments_query = select(Enrollment).where(Enrollment.course_id.in_(course_ids))
+    enrollments_result = await db.execute(enrollments_query)
+    enrollments = list(enrollments_result.scalars().all())
+
+    # Calculate total unique students
+    unique_students = {e.student_id for e in enrollments}
+    total_students = len(unique_students)
+
+    # Calculate total revenue
+    total_revenue = sum(e.payment_amount_vnd for e in enrollments if e.payment_status == "paid")
+
+    # Get recent enrollments (group by date)
+    recent_enrollments_dict = {}
+    for e in enrollments:
+        if e.enrolled_at:
+            date_str = e.enrolled_at.strftime("%Y-%m-%d")
+            recent_enrollments_dict[date_str] = recent_enrollments_dict.get(date_str, 0) + 1
+    
+    recent_enrollments = [
+        {"date": date, "count": count}
+        for date, count in sorted(recent_enrollments_dict.items())[-7:]
+    ]
+
+    # Calculate individual course stats
+    course_stats = []
+    for c in courses:
+        c_enrollments = [e for e in enrollments if e.course_id == c.id]
+        c_revenue = sum(e.payment_amount_vnd for e in c_enrollments if e.payment_status == "paid")
+        course_stats.append({
+            "course_id": str(c.id),
+            "title": c.title,
+            "enrollment_count": len(c_enrollments),
+            "revenue": c_revenue,
+            "rating_avg": c.rating_avg or 0.0
+        })
+
+    return {
+        "total_courses": total_courses,
+        "total_students": total_students,
+        "total_revenue": total_revenue,
+        "avg_rating": avg_rating,
+        "recent_enrollments": recent_enrollments,
+        "course_stats": course_stats
+    }
+
+
 @router.get("/{course_id}", response_model=CourseDetailResponse)
 async def get_course(
     course_id: UUID,
@@ -160,13 +239,20 @@ async def get_course(
         description=course.description,
         thumbnail_url=course.thumbnail_url,
         price_vnd=course.price_vnd,
+        price=course.price_vnd,
         status=course.status,
+        level=course.level,
+        language=course.language,
+        requirements=course.requirements,
+        learning_outcomes=course.learning_outcomes,
+        tags=course.tags,
         created_at=course.created_at,
         updated_at=course.updated_at,
         lecturer=course.lecturer,
         category=course.category,
         materials_count=materials_count,
         enrolled_count=enrolled_count,
+        materials=course.materials if course.materials else [],
     )
     await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_COURSES)
     return response
@@ -219,7 +305,12 @@ async def update_course(
         category_id=payload.category_id,
         price_vnd=payload.price_vnd,
         thumbnail_url=payload.thumbnail_url,
-    )
+        level=payload.level,
+        language=payload.language,
+        requirements=payload.requirements,
+        learning_outcomes=payload.learning_outcomes,
+        tags=payload.tags,
+     )
     await RedisCache().delete_pattern("cache:courses:*")
     return _to_response(updated)
 
@@ -264,6 +355,28 @@ async def archive_course(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     updated = await service.archive(course_id)
+    await RedisCache().delete_pattern("cache:courses:*")
+    return _to_response(updated)
+
+
+@router.post("/{course_id}/unarchive", response_model=CourseResponse)
+async def unarchive_course(
+    course_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_lecturer),
+) -> CourseResponse:
+    """Unarchive a course (restore to published). Owner or Admin only."""
+    repo = CourseRepository(db)
+    service = CourseService(repo)
+
+    course = await service.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    if course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    updated = await service.unarchive(course_id)
     await RedisCache().delete_pattern("cache:courses:*")
     return _to_response(updated)
 

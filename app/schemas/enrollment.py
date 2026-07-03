@@ -44,6 +44,9 @@ class EnrollmentWithCourseResponse(EnrollmentResponse):
     course_title: str | None = None
     course_thumbnail: str | None = None
     lecturer_name: str | None = None
+    student_name: str | None = None
+    student_email: str | None = None
+    student_avatar_url: str | None = None
 
     class Config:
         from_attributes = True

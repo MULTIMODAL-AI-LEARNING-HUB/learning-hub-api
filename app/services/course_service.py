@@ -78,7 +78,12 @@ class CourseService:
         description: str | None = None,
         category_id: UUID | None = None,
         price_vnd: int | None = None,
-        thumbnail_url: str | None = None
+        thumbnail_url: str | None = None,
+        level: str | None = None,
+        language: str | None = None,
+        requirements: str | None = None,
+        learning_outcomes: str | None = None,
+        tags: str | None = None
     ) -> Course | None:
         course = await self.repo.get_by_id(course_id)
         if not course:
@@ -94,6 +99,16 @@ class CourseService:
             course.price_vnd = price_vnd
         if thumbnail_url is not None:
             course.thumbnail_url = thumbnail_url
+        if level is not None:
+            course.level = level
+        if language is not None:
+            course.language = language
+        if requirements is not None:
+            course.requirements = requirements
+        if learning_outcomes is not None:
+            course.learning_outcomes = learning_outcomes
+        if tags is not None:
+            course.tags = tags
 
         return await self.repo.update(course)
 
@@ -109,6 +124,13 @@ class CourseService:
         if not course:
             return None
         course.status = "archived"
+        return await self.repo.update(course)
+
+    async def unarchive(self, course_id: UUID) -> Course | None:
+        course = await self.repo.get_by_id(course_id)
+        if not course:
+            return None
+        course.status = "published"
         return await self.repo.update(course)
 
     async def delete(self, course_id: UUID) -> None:

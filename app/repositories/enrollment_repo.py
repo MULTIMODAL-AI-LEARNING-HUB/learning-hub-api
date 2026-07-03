@@ -42,7 +42,8 @@ class EnrollmentRepository(BaseRepository):
         if status:
             query = query.where(Enrollment.status == status)
         query = query.options(
-            selectinload(Enrollment.course).selectinload(Course.lecturer)
+            selectinload(Enrollment.course).selectinload(Course.lecturer),
+            selectinload(Enrollment.student)
         ).order_by(Enrollment.enrolled_at.desc())
         result = await self.db.execute(query)
         return list(result.scalars().all())

@@ -60,6 +60,9 @@ def _to_enrollment_with_course(enrollment: Enrollment) -> EnrollmentWithCourseRe
         course_title=enrollment.course.title if enrollment.course else None,
         course_thumbnail=enrollment.course.thumbnail_url if enrollment.course else None,
         lecturer_name=enrollment.course.lecturer.full_name if enrollment.course and enrollment.course.lecturer else None,
+        student_name=enrollment.student.full_name if enrollment.student else None,
+        student_email=enrollment.student.email if enrollment.student else None,
+        student_avatar_url=enrollment.student.avatar_url if enrollment.student else None,
     )
 
 

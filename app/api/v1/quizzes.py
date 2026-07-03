@@ -49,7 +49,7 @@ async def get_quiz(
     result = await db.execute(
         select(Quiz)
         .where(Quiz.lesson_id == lesson_id)
-        .options(selectinload(Quiz.questions).selectinload(Quiz.answers))
+        .options(selectinload(Quiz.questions).selectinload(Question.answers))
     )
     quiz = result.scalar_one_or_none()
     if not quiz:

@@ -58,7 +58,7 @@ async def create_section(
     await verify_course_ownership(course, current_user)
 
     result = await db.execute(
-        select(Section).where(Section.course_id == course_id).order_by(Section.order_index.desc()).limit(1)
+        select(Section).where(Section.course_id == course_id).order_by(Section.order_index.desc()).limit(1).with_for_update()
     )
     last_section = result.scalar_one_or_none()
     next_order = (last_section.order_index + 1) if last_section else 0

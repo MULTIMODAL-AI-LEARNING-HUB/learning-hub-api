@@ -50,7 +50,6 @@ class CourseResponse(BaseModel):
     description: str | None = None
     thumbnail_url: str | None = None
     price_vnd: int
-    price: int
     status: str
     level: str = "beginner"
     language: str = "en"

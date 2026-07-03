@@ -25,7 +25,6 @@ class SectionResponse(BaseModel):
     order_index: int
     created_at: datetime
     updated_at: datetime
-    lesson_count: int = 0
 
     class Config:
         from_attributes = True

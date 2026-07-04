@@ -2,7 +2,6 @@ from datetime import datetime
 from uuid import UUID
 import uuid
 from typing import List
-import json
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession

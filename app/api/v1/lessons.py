@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from uuid import UUID
+import uuid
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from app.dependencies.auth import get_current_user, require_lecturer
 from app.models.user import User
 from app.core.cache import RedisCache
 from app.core.config import settings
+from app.clients.minio_client import MinioClient
 
 router = APIRouter(prefix="/sections/{section_id}/lessons", tags=["Lessons"])
 
@@ -140,6 +142,21 @@ async def get_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
 
+    # Generate presigned URLs for video_url and attachments
+    if lesson.video_url and lesson.video_url.startswith("s3://"):
+        try:
+            lesson.video_url = MinioClient().get_presigned_url(lesson.video_url)
+        except Exception:
+            pass
+
+    if lesson.attachments:
+        for att in lesson.attachments:
+            if att.file_url and att.file_url.startswith("s3://"):
+                try:
+                    att.file_url = MinioClient().get_presigned_url(att.file_url)
+                except Exception:
+                    pass
+
     from fastapi.encoders import jsonable_encoder
     lesson_data = jsonable_encoder(lesson)
     await cache.set(cache_key, lesson_data, ttl=settings.REDIS_CACHE_TTL_LESSONS)
@@ -238,6 +255,15 @@ async def list_attachments(
         select(Attachment).where(Attachment.lesson_id == lesson_id).order_by(Attachment.uploaded_at.desc())
     )
     attachments = result.scalars().all()
+    
+    # Generate presigned URLs
+    for att in attachments:
+        if att.file_url and att.file_url.startswith("s3://"):
+            try:
+                att.file_url = MinioClient().get_presigned_url(att.file_url)
+            except Exception:
+                pass
+                
     return attachments
 
 
@@ -262,6 +288,56 @@ async def create_attachment(
     db.add(attachment)
     await db.commit()
     await db.refresh(attachment)
+    
+    # Generate presigned URL for response
+    if attachment.file_url and attachment.file_url.startswith("s3://"):
+        try:
+            attachment.file_url = MinioClient().get_presigned_url(attachment.file_url)
+        except Exception:
+            pass
+            
+    return attachment
+
+
+@router.post("/{lesson_id}/attachments/upload", response_model=AttachmentResponse, status_code=status.HTTP_201_CREATED)
+async def upload_lesson_attachment(
+    section_id: UUID,
+    lesson_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_lecturer)
+):
+    section, course = await get_section_with_course(db, section_id)
+    await verify_course_ownership(course, current_user)
+
+    content = await file.read()
+    ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    
+    # Structured key: materials/{course_id}/{lesson_id}/{uuid}.{ext}
+    minio_key = f"materials/{course.id}/{lesson_id}/{uuid.uuid4()}.{ext}"
+    
+    # Upload file
+    minio_client = MinioClient()
+    storage_uri = minio_client.upload_file(content, minio_key, file.content_type)
+
+    attachment = Attachment(
+        lesson_id=lesson_id,
+        file_name=file.filename,
+        file_url=storage_uri,
+        file_type=file.content_type,
+        file_size=len(content)
+    )
+    db.add(attachment)
+    await db.commit()
+    await db.refresh(attachment)
+    
+    # Generate presigned URL for output response
+    if attachment.file_url and attachment.file_url.startswith("s3://"):
+        try:
+            attachment.file_url = minio_client.get_presigned_url(attachment.file_url)
+        except Exception:
+            pass
+
     return attachment
 
 
@@ -282,6 +358,13 @@ async def delete_attachment(
     attachment = result.scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Delete physical file from MinIO
+    if attachment.file_url and attachment.file_url.startswith("s3://"):
+        try:
+            MinioClient().delete_file(attachment.file_url)
+        except Exception as e:
+            print(f"Failed to delete file from MinIO: {e}")
 
     await db.delete(attachment)
     await db.commit()

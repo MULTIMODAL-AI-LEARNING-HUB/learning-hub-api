@@ -341,7 +341,7 @@ async def upload_lesson_attachment(
     return attachment
 
 
-@router.delete("/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{lesson_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_attachment(
     section_id: UUID,
     lesson_id: UUID,

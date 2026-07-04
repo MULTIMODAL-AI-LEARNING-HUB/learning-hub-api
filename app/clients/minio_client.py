@@ -45,7 +45,8 @@ class MinioClient:
 
     def delete_file(self, key: str) -> None:
         """Delete object from MinIO."""
-        self.client.remove_object(bucket_name=self.bucket, object_name=key)
+        clean_key = key.replace(f"s3://{self.bucket}/", "")
+        self.client.remove_object(bucket_name=self.bucket, object_name=clean_key)
 
     def get_presigned_url(self, key: str, expires_seconds: int = 3600) -> str:
         """Generate a presigned GET URL for an object."""

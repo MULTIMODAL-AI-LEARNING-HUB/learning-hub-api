@@ -128,6 +128,16 @@ async def upload_material(
     )
     material = await repo.create(material)
 
+    if ext == "pdf":
+        from app.tasks.lesson_tasks import dispatch_process_course_file
+        dispatch_process_course_file(
+            storage_key=minio_key,
+            course_id=str(course_id),
+            material_id=str(material.id),
+            source_type="course_material",
+            file_name=filename,
+        )
+
     return _to_response(material)
 
 

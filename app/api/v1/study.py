@@ -78,10 +78,10 @@ async def generate_quiz_by_course(
         )
 
     from app.tasks.quiz_tasks import dispatch_generate_quiz_by_course
-    material_ids = [str(m) for m in (payload.material_ids or [])]
+    lesson_ids = [str(m) for m in (payload.lesson_ids or [])]
     job_id = dispatch_generate_quiz_by_course(
         str(payload.course_id),
-        material_ids,
+        lesson_ids,
         payload.quiz_type,
         payload.question_count
     )

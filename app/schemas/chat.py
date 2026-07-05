@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class ChatSessionCreateRequest(BaseModel):
     course_id: UUID | None = None
+    lesson_id: UUID | None = None
     title: str | None = Field(default=None, max_length=255)
     context_type: str = "general"
 
@@ -13,6 +14,7 @@ class ChatSessionCreateRequest(BaseModel):
 class ChatSessionResponse(BaseModel):
     id: UUID
     course_id: UUID | None = None
+    lesson_id: UUID | None = None
     title: str | None = None
     context_type: str
     created_at: datetime
@@ -22,6 +24,7 @@ class ChatSessionResponse(BaseModel):
 class ChatSessionListItem(BaseModel):
     id: UUID
     course_id: UUID | None = None
+    lesson_id: UUID | None = None
     title: str | None = None
     context_type: str
     updated_at: datetime
@@ -39,6 +42,7 @@ class ChatAskRequest(BaseModel):
     session_id: UUID
     query: str
     course_id: UUID | None = None
+    lesson_id: UUID | None = None
     document_ids: list[UUID] | None = None
 
 

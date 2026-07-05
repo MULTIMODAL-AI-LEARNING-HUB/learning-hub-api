@@ -111,6 +111,11 @@ async def create_lesson(
     await db.commit()
     await db.refresh(lesson)
     await RedisCache().delete(f"cache:lessons:{lesson.id}")
+
+    if lesson.content:
+        from app.tasks.lesson_tasks import dispatch_process_lesson_content
+        dispatch_process_lesson_content(str(lesson.id), str(course.id))
+
     return lesson
 
 
@@ -187,6 +192,11 @@ async def update_lesson(
     await db.commit()
     await db.refresh(lesson)
     await RedisCache().delete(f"cache:lessons:{lesson.id}")
+
+    if lesson_data.content is not None and lesson.content:
+        from app.tasks.lesson_tasks import dispatch_process_lesson_content
+        dispatch_process_lesson_content(str(lesson.id), str(course.id))
+
     return lesson
 
 
@@ -295,7 +305,17 @@ async def create_attachment(
             attachment.file_url = MinioClient().get_presigned_url(attachment.file_url)
         except Exception:
             pass
-            
+
+    if attachment.file_type == "pdf" and attachment.file_url:
+        from app.tasks.lesson_tasks import dispatch_process_course_file
+        dispatch_process_course_file(
+            storage_key=attachment.file_url,
+            course_id=str(course.id),
+            lesson_id=str(lesson_id),
+            source_type="lesson_attachment",
+            file_name=attachment_data.file_name,
+        )
+
     return attachment
 
 
@@ -337,6 +357,17 @@ async def upload_lesson_attachment(
             attachment.file_url = minio_client.get_presigned_url(attachment.file_url)
         except Exception:
             pass
+
+    # Dispatch vectorization task for supported file types
+    if ext == "pdf":
+        from app.tasks.lesson_tasks import dispatch_process_course_file
+        dispatch_process_course_file(
+            storage_key=minio_key,
+            course_id=str(course.id),
+            lesson_id=str(lesson_id),
+            source_type="lesson_attachment",
+            file_name=file.filename,
+        )
 
     return attachment
 

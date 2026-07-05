@@ -14,6 +14,32 @@ def dispatch_generate_quiz(document_id: str, quiz_type: str, question_count: int
     return task.id
 
 
+def dispatch_generate_quiz_by_course(
+    course_id: str,
+    lesson_ids: list[str] | None = None,
+    quiz_type: str = "quick",
+    question_count: int = 10
+) -> str:
+    """Dispatch a quiz generation task for course/lesson content.
+
+    Args:
+        course_id: Course UUID to generate quiz from
+        lesson_ids: Optional list of specific lesson UUIDs to focus on
+        quiz_type: "quick" or "detailed"
+        question_count: Number of questions to generate
+    """
+    task = celery_app.send_task(
+        "generate_quiz_by_course_task",
+        args=[course_id],
+        kwargs={
+            "lesson_ids": lesson_ids or [],
+            "quiz_type": quiz_type,
+            "question_count": question_count,
+        }
+    )
+    return task.id
+
+
 def get_quiz_job_status(job_id: str) -> dict:
     """Retrieve the status and results of a quiz generation job."""
     res = AsyncResult(job_id, app=celery_app)

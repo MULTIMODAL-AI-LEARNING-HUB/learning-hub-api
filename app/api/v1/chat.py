@@ -180,11 +180,14 @@ async def ask(
     service = ChatService(repo)
     await service.add_user_message(session.id, payload.query, payload.course_id)
 
+    lesson_id = payload.lesson_id
+
     ai_response = await AiClient().ask({
         "session_id": str(session.id),
         "user_id": str(current_user.id),
         "query": payload.query,
         "course_id": str(course_id) if course_id else None,
+        "lesson_id": str(lesson_id) if lesson_id else None,
         "document_ids": [str(d) for d in payload.document_ids or []],
     })
 

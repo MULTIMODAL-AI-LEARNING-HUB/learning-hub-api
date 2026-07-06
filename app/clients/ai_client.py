@@ -66,3 +66,27 @@ class AiClient:
         )
         response.raise_for_status()
         return response.json()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True
+    )
+    async def generate_quiz_from_lesson(
+        self,
+        lesson_id: str,
+        course_id: str,
+        question_count: int = 5,
+        lesson_content: str | None = ""
+    ) -> dict[str, Any]:
+        """Request AI service to generate a quiz from lesson resources."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
+        payload = {
+            "lesson_id": lesson_id,
+            "course_id": course_id,
+            "question_count": question_count,
+            "lesson_content": lesson_content or ""
+        }
+        response = await self.client.post("/study/quiz/generate-from-lesson", json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from uuid import UUID
 from typing import List
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.models import Course, Enrollment, Review
@@ -27,30 +27,43 @@ async def verify_course_ownership(course: Course, current_user: User) -> None:
         raise HTTPException(status_code=403, detail="Not authorized")
 
 
-@router.get("", response_model=List[ReviewResponse])
+@router.get("")
 async def list_reviews(
     course_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     course = await get_course_or_404(db, course_id)
 
+    # Count total for pagination
+    count_result = await db.execute(
+        select(func.count(Review.id))
+        .join(Enrollment)
+        .where(Enrollment.course_id == course_id)
+    )
+    total = count_result.scalar_one()
+
+    offset = (page - 1) * page_size
     result = await db.execute(
         select(Review)
         .join(Enrollment)
         .where(Enrollment.course_id == course_id)
         .order_by(Review.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
     )
     reviews = result.scalars().all()
 
-    response = []
+    items = []
     for r in reviews:
         enrollment_result = await db.execute(select(Enrollment).where(Enrollment.id == r.enrollment_id))
         enrollment = enrollment_result.scalar_one_or_none()
         if enrollment:
             student_result = await db.execute(select(User).where(User.id == enrollment.student_id))
             student = student_result.scalar_one_or_none()
-            response.append({
+            items.append({
                 "id": r.id,
                 "enrollment_id": r.enrollment_id,
                 "rating": r.rating,
@@ -61,7 +74,7 @@ async def list_reviews(
                 "student_name": student.full_name if student else None,
                 "course_title": course.title
             })
-    return response
+    return {"items": items, "total": total}
 
 
 @router.post("", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)

@@ -40,7 +40,7 @@ class ChatSessionListResponse(BaseModel):
 
 class ChatAskRequest(BaseModel):
     session_id: UUID
-    query: str
+    query: str = Field(min_length=1, max_length=5000)
     course_id: UUID | None = None
     lesson_id: UUID | None = None
     document_ids: list[UUID] | None = None

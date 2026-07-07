@@ -1,4 +1,5 @@
 import asyncio
+import os
 from sqlalchemy.future import select
 from app.core.database import async_session_factory
 from app.core.security import hash_password
@@ -12,10 +13,16 @@ async def init_db() -> None:
         admin_user = result.scalars().first()
 
         if not admin_user:
+            admin_password = os.environ.get("ADMIN_PASSWORD")
+            if not admin_password:
+                raise ValueError(
+                    "ADMIN_PASSWORD environment variable must be set for initial admin seeding. "
+                    "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(16))\""
+                )
             print("Seeding default administrator...")
             admin_user = User(
                 email="admin@learninghub.com",
-                password_hash=hash_password("admin123"),
+                password_hash=hash_password(admin_password),
                 full_name="System Administrator",
                 role="admin",
                 is_active=True

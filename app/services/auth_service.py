@@ -5,12 +5,15 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password
+from app.core.cache import get_redis_client
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.services.email_service import EmailService
 
 
 RESET_TOKEN_EXPIRE_MINUTES = 30
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_LOCKOUT_MINUTES = 15
 
 
 class AuthService:
@@ -43,8 +46,38 @@ class AuthService:
 
     async def authenticate(self, email: str, password: str) -> User:
         user = await self.repo.get_by_email(email)
+
+        # Check brute-force lockout
+        if user:
+            redis = get_redis_client()
+            lockout_key = f"login_lockout:{user.id}"
+            is_locked = await redis.get(lockout_key)
+            if is_locked:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes."
+                )
+
         if not user or not verify_password(password, user.password_hash):
+            # Track failed attempt
+            if user:
+                redis = get_redis_client()
+                fail_key = f"login_fails:{user.id}"
+                attempts = await redis.incr(fail_key)
+                await redis.expire(fail_key, LOGIN_LOCKOUT_MINUTES * 60)
+                if attempts >= MAX_LOGIN_ATTEMPTS:
+                    lockout_key = f"login_lockout:{user.id}"
+                    await redis.set(lockout_key, "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes."
+                    )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+        # Clear failed attempts on successful login
+        redis = get_redis_client()
+        await redis.delete(f"login_fails:{user.id}")
+
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
         return user
@@ -66,12 +99,20 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired reset token"
             )
-        await self.repo.update_password(user.id, hash_password(new_password))
+        # Invalidate all existing tokens by incrementing version
+        new_version = (user.token_version or 0) + 1
+        await self.repo.update_password(user.id, hash_password(new_password), token_version=new_version)
 
     @staticmethod
-    def build_access_token(user_id: UUID) -> str:
-        return create_access_token({"sub": str(user_id)})
+    def build_access_token(user_id: UUID, token_version: int = 0) -> str:
+        return create_access_token({"sub": str(user_id), "ver": token_version})
 
     @staticmethod
-    def build_refresh_token(user_id: UUID) -> str:
-        return create_refresh_token({"sub": str(user_id)})
+    def build_refresh_token(user_id: UUID, token_version: int = 0) -> str:
+        return create_refresh_token({"sub": str(user_id), "ver": token_version})
+
+    @staticmethod
+    async def invalidate_refresh_token(jti: str) -> None:
+        """Blacklist a refresh token by its jti claim."""
+        redis = get_redis_client()
+        await redis.set(f"revoked_token:{jti}", "1", ex=LOGIN_LOCKOUT_MINUTES * 60)

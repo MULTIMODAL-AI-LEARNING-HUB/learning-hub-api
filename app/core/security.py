@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import bcrypt
 from jose import JWTError, jwt
@@ -8,7 +9,7 @@ from app.core.config import settings
 
 def hash_password(password: str) -> str:
     pwd_bytes = password.encode("utf-8")
-    salt = bcrypt.gensalt()
+    salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(pwd_bytes, salt)
     return hashed.decode("utf-8")
 
@@ -52,7 +53,11 @@ def _create_token(
         expire = now + timedelta(days=days)
     else:
         raise ValueError("Token expiry not specified")
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "iat": now.isoformat(),
+        "jti": str(uuid4()),
+    })
     if token_type:
         to_encode.update({"type": token_type})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

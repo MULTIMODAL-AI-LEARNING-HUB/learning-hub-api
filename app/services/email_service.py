@@ -21,7 +21,8 @@ class EmailService:
 
     @staticmethod
     async def send_password_reset(email_to: str, token: str, full_name: str | None = None) -> None:
-        reset_link = f"http://localhost:5173/reset-password/{token}"
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+        reset_link = f"{frontend_url}/reset-password/{token}"
         name = full_name or email_to
 
         subject = "Reset your Learning Hub password"

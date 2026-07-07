@@ -1,3 +1,4 @@
+import secrets
 from typing import Any
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,9 +46,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     CORS_ORIGINS: Any = ["http://localhost:5173"]
+    FRONTEND_URL: str = "http://localhost:5173"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -111,23 +113,37 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_secrets(self) -> "Settings":
-        if not self.DEBUG:
-            import os
-            import sys
-            # Bypass validation during migrations (alembic) or test execution
-            is_migration_or_test = (
-                "alembic" in sys.modules
-                or any("alembic" in arg for arg in sys.argv)
-                or os.environ.get("MIGRATION_MODE") == "True"
-                or "pytest" in sys.modules
-            )
-            if is_migration_or_test:
-                return self
+        import os
+        import sys
+        # Bypass validation during migrations (alembic) or test execution
+        is_migration_or_test = (
+            "alembic" in sys.modules
+            or any("alembic" in arg for arg in sys.argv)
+            or os.environ.get("MIGRATION_MODE") == "True"
+            or "pytest" in sys.modules
+        )
+        if is_migration_or_test:
+            return self
 
-            if not self.SECRET_KEY or self.SECRET_KEY in {"", "mysecretkey", "your_secret_key_for_jwt"}:
-                raise ValueError("SECRET_KEY must be a secure, non-default string in production")
-            if not self.INTERNAL_API_KEY or self.INTERNAL_API_KEY in {"", "your_internal_api_key"}:
-                raise ValueError("INTERNAL_API_KEY must be a secure, non-default string in production")
+        # These checks ALWAYS run regardless of DEBUG
+        WEAK_SECRET_KEYS = {"", "mysecretkey", "your_secret_key_for_jwt", "changeme", "secret"}
+        WEAK_INTERNAL_KEYS = {"", "your_internal_api_key", "your_internal_key", "changeme", "secret"}
+
+        if not self.SECRET_KEY or self.SECRET_KEY in WEAK_SECRET_KEYS or len(self.SECRET_KEY) < 32:
+            raise ValueError(
+                "SECRET_KEY must be a secure, non-default string (min 32 chars). "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        if not self.INTERNAL_API_KEY or self.INTERNAL_API_KEY in WEAK_INTERNAL_KEYS or len(self.INTERNAL_API_KEY) < 16:
+            raise ValueError(
+                "INTERNAL_API_KEY must be a secure, non-default string (min 16 chars). "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(16))\""
+            )
+
+        # Additional production-only checks
+        if not self.DEBUG:
+            if not self.MINIO_SECRET_KEY or self.MINIO_SECRET_KEY == "minioadmin123":
+                raise ValueError("MINIO_SECRET_KEY must not be the default value in production")
         return self
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

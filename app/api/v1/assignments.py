@@ -187,7 +187,15 @@ async def upload_submission_file(
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     content = await file.read()
-    ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+
+    # Security: validate file type and size
+    allowed_exts = {"pdf", "doc", "docx", "png", "jpg", "jpeg", "txt", "zip"}
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail=f"File type '.{ext}' not allowed. Allowed: {', '.join(sorted(allowed_exts))}")
+    max_size = 20 * 1024 * 1024  # 20MB
+    if len(content) > max_size:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 20MB")
     
     # Key: submissions/{assignment_id}/{student_id}/{uuid}.{ext}
     minio_key = f"submissions/{assignment.id}/{current_user.id}/{uuid.uuid4()}.{ext}"
@@ -293,9 +301,13 @@ async def get_my_submissions(
     if not assignment:
         return []
 
+    # Security: only return current user's submissions
     submissions_result = await db.execute(
         select(AssignmentSubmission)
-        .where(AssignmentSubmission.assignment_id == assignment.id)
+        .where(
+            AssignmentSubmission.assignment_id == assignment.id,
+            AssignmentSubmission.student_id == current_user.id
+        )
         .order_by(AssignmentSubmission.submitted_at.desc())
     )
     submissions = submissions_result.scalars().all()

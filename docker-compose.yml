@@ -36,9 +36,9 @@ services:
     image: postgres:14-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ai_hub_user
-      POSTGRES_PASSWORD: my_secure_password
-      POSTGRES_DB: ai_learning_hub_db
+      POSTGRES_USER: ${DB_USER:-ai_hub_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-ai_learning_hub_db}
     ports:
       - "5432:5432"
     volumes:
@@ -100,8 +100,8 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
     volumes:
       - minio_data:/data
     healthcheck:

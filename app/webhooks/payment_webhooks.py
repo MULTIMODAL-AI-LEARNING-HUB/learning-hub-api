@@ -63,6 +63,10 @@ async def vnpay_ipn(
     vnpay = get_vnpay_service()
     result = vnpay.verify_return(params)
 
+    if not result["is_valid"]:
+        logger.warning("VNPay IPN: invalid signature")
+        return {"success": False, "message": "Invalid signature"}
+
     transaction_id = result["transaction_id"]
     enrollment_repo = EnrollmentRepository(db)
     payment_repo = PaymentRepository(db)
@@ -118,6 +122,10 @@ async def momo_ipn(
 
     momo = get_momo_service()
     result = momo.verify_callback(params)
+
+    if not result["is_valid"]:
+        logger.warning("MoMo IPN: invalid signature")
+        return {"success": False, "message": "Invalid signature"}
 
     transaction_id = result.get("order_id", "")
     enrollment_repo = EnrollmentRepository(db)

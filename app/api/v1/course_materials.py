@@ -108,10 +108,12 @@ async def upload_material(
     try:
         minio_client = MinioClient()
         storage_uri = minio_client.upload_file(content, minio_key, file.content_type)
-    except Exception as e:
+    except Exception:
+        import logging
+        logging.exception("MinIO upload failed for course %s", course_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to store file: {str(e)}"
+            detail="Failed to store file"
         )
 
     repo = CourseMaterialRepository(db)

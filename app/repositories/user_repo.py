@@ -70,7 +70,7 @@ class UserRepository(BaseRepository):
         )
         return result.scalar_one_or_none()
 
-    async def update_password(self, user_id: UUID, new_password_hash: str) -> None:
+    async def update_password(self, user_id: UUID, new_password_hash: str, token_version: int | None = None) -> None:
         result = await self.db.execute(
             select(User).where(User.id == user_id)
         )
@@ -79,6 +79,8 @@ class UserRepository(BaseRepository):
             user.password_hash = new_password_hash
             user.reset_token = None
             user.reset_token_expiry = None
+            if token_version is not None:
+                user.token_version = token_version
             await self.db.commit()
 
     async def clear_reset_token(self, user_id: UUID) -> None:

@@ -1,5 +1,6 @@
 """Document API endpoints."""
 
+import logging
 import uuid
 from uuid import UUID
 
@@ -91,10 +92,11 @@ async def upload(
     try:
         minio_client = MinioClient()
         storage_uri = minio_client.upload_file(content, minio_key, file.content_type)
-    except Exception as e:
+    except Exception:
+        logging.exception("MinIO upload failed for user %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to store file in object storage: {str(e)}"
+            detail="Failed to store file in object storage"
         )
 
     # 4. Save to Database

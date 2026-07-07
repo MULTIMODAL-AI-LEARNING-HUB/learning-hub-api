@@ -63,9 +63,9 @@ async def register(
 ) -> AuthResponse:
     """Register a new user, automatically provisioning a default quota."""
     service = AuthService(UserRepository(db))
-    user = await service.register(payload.email, payload.password, payload.full_name, payload.role)
-    access_token = service.build_access_token(user.id)
-    refresh_token = service.build_refresh_token(user.id)
+    user = await service.register(payload.email, payload.password, payload.full_name)
+    access_token = service.build_access_token(user.id, user.token_version or 0)
+    refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
     return AuthResponse(
         user=_build_user_response(user),
         token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
@@ -82,8 +82,8 @@ async def login(
     """Authenticate credentials and return JWT tokens."""
     service = AuthService(UserRepository(db))
     user = await service.authenticate(payload.email, payload.password)
-    access_token = service.build_access_token(user.id)
-    refresh_token = service.build_refresh_token(user.id)
+    access_token = service.build_access_token(user.id, user.token_version or 0)
+    refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
     return AuthResponse(
         user=_build_user_response(user),
         token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
@@ -101,6 +101,16 @@ async def refresh(
     token_payload = decode_token(payload.refresh_token)
     if not token_payload or token_payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    # Check if token was revoked
+    jti = token_payload.get("jti")
+    if jti:
+        from app.core.cache import get_redis_client
+        r = get_redis_client()
+        is_revoked = await r.get(f"revoked_token:{jti}")
+        if is_revoked:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
+
     user_id = token_payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -109,9 +119,19 @@ async def refresh(
     user = await repo.get_by_id(UUID(user_id))
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    # Check token version matches (prevents use after password reset)
+    token_version = token_payload.get("ver", 0)
+    if token_version != (user.token_version or 0):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalidated. Please login again.")
+
+    # Revoke the old refresh token
+    if jti:
+        await AuthService.invalidate_refresh_token(jti)
+
     service = AuthService(repo)
-    access_token = service.build_access_token(user.id)
-    refresh_token = service.build_refresh_token(user.id)
+    access_token = service.build_access_token(user.id, user.token_version or 0)
+    refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 

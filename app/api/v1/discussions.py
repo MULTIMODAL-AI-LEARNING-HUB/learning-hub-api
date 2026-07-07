@@ -138,8 +138,8 @@ async def update_discussion(
     if discussion.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    for key, value in discussion_data.model_dump(exclude_unset=True).items():
-        setattr(discussion, key, value)
+    if discussion_data.content is not None:
+        discussion.content = discussion_data.content
 
     await db.commit()
     await db.refresh(discussion)

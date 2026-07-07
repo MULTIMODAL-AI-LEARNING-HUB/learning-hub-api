@@ -34,6 +34,12 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
+
+    # Verify token version matches (invalidates tokens after password reset)
+    token_version = payload.get("ver", 0)
+    if token_version != (user.token_version or 0):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalidated. Please login again.")
+
     return user
 
 

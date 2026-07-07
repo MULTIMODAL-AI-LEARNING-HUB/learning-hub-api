@@ -491,6 +491,16 @@ async def submit_quiz_attempt(
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
 
+    # Verify attempt belongs to current user's enrollment
+    enrollment_check = await db.execute(
+        select(Enrollment).where(
+            Enrollment.id == attempt.enrollment_id,
+            Enrollment.student_id == current_user.id
+        )
+    )
+    if not enrollment_check.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Not authorized to submit this attempt")
+
     quiz_result = await db.execute(select(Quiz).where(Quiz.lesson_id == lesson_id))
     quiz = quiz_result.scalar_one_or_none()
     if not quiz:

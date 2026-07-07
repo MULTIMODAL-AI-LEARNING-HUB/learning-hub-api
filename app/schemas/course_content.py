@@ -325,14 +325,12 @@ class SubmissionResponse(BaseModel):
 # ============ DISCUSSION SCHEMAS ============
 
 class DiscussionCreate(BaseModel):
-    content: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1, max_length=10000)
     parent_id: Optional[UUID] = None
 
 
 class DiscussionUpdate(BaseModel):
-    content: Optional[str] = None
-    is_pinned: Optional[bool] = None
-    is_answer: Optional[bool] = None
+    content: str = Field(..., min_length=1, max_length=10000)
 
 
 class DiscussionResponse(BaseModel):

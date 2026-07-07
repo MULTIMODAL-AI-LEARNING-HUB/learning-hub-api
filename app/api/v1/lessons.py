@@ -331,7 +331,15 @@ async def upload_lesson_attachment(
     await verify_course_ownership(course, current_user)
 
     content = await file.read()
-    ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+
+    # Security: validate file type and size
+    allowed_exts = {"pdf", "doc", "docx", "png", "jpg", "jpeg", "mp4", "webm", "mp3", "txt", "zip"}
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail=f"File type '.{ext}' not allowed. Allowed: {', '.join(sorted(allowed_exts))}")
+    max_size = 50 * 1024 * 1024  # 50MB
+    if len(content) > max_size:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 50MB")
     
     # Structured key: materials/{course_id}/{lesson_id}/{uuid}.{ext}
     minio_key = f"materials/{course.id}/{lesson_id}/{uuid.uuid4()}.{ext}"

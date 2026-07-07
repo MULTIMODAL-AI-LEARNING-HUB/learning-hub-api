@@ -105,7 +105,6 @@ async def refresh(
     # Check if token was revoked
     jti = token_payload.get("jti")
     if jti:
-        redis = RedisCache()
         from app.core.cache import get_redis_client
         r = get_redis_client()
         is_revoked = await r.get(f"revoked_token:{jti}")

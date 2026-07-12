@@ -24,6 +24,5 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
         content={
             "error": "rate_limit_exceeded",
             "message": "Too many requests. Please try again later.",
-            "retry_after": exc.retry_after,
         },
     )

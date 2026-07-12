@@ -55,7 +55,7 @@ def _create_token(
         raise ValueError("Token expiry not specified")
     to_encode.update({
         "exp": expire,
-        "iat": now.isoformat(),
+        "iat": int(now.timestamp()),
         "jti": str(uuid4()),
     })
     if token_type:

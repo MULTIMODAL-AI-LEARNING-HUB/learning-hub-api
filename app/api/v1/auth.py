@@ -63,7 +63,7 @@ async def register(
 ) -> AuthResponse:
     """Register a new user, automatically provisioning a default quota."""
     service = AuthService(UserRepository(db))
-    user = await service.register(payload.email, payload.password, payload.full_name)
+    user = await service.register(payload.email, payload.password, payload.full_name, payload.role)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
     return AuthResponse(

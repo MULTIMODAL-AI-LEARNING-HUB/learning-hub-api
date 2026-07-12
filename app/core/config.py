@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     REDIS_CACHE_TTL_LESSONS: int = 120
     AI_SERVICE_TIMEOUT: int = 60
 
-    RATE_LIMIT_AUTH: str = "10/minute"
+    RATE_LIMIT_AUTH: str = "500/minute"
     RATE_LIMIT_CHAT: str = "30/minute"
     RATE_LIMIT_UPLOAD: str = "5/minute"
     RATE_LIMIT_ADMIN: str = "60/minute"

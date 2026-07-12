@@ -66,12 +66,12 @@ async def generate_quiz_by_course(
     from app.repositories.course_repo import CourseRepository
     from app.repositories.enrollment_repo import EnrollmentRepository
 
-    course = await CourseRepository(db).get_by_id(str(payload.course_id))
+    course = await CourseRepository(db).get_by_id(payload.course_id)
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    enrollment = await EnrollmentRepository(db).get_by_user_and_course(current_user.id, str(payload.course_id))
-    if not enrollment and course.price > 0:
+    enrollment = await EnrollmentRepository(db).get_by_user_and_course(current_user.id, payload.course_id)
+    if not enrollment and course.price_vnd > 0:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You must be enrolled to generate quiz from this course"

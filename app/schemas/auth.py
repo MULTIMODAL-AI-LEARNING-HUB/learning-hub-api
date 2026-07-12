@@ -8,6 +8,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12)
     full_name: str | None = Field(default=None, max_length=255)
+    role: str = Field(default="student", pattern="^(student|lecturer|admin)$")
 
 
 class LoginRequest(BaseModel):

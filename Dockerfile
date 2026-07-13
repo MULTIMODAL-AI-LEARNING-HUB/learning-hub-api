@@ -1,3 +1,4 @@
+# Cache bust to force fresh build and copy migrations
 FROM python:3.10-slim AS builder
 
 WORKDIR /app

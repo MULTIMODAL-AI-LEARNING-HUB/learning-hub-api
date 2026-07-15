@@ -49,34 +49,51 @@ class AuthService:
 
         # Check brute-force lockout
         if user:
-            redis = get_redis_client()
-            lockout_key = f"login_lockout:{user.id}"
-            is_locked = await redis.get(lockout_key)
-            if is_locked:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes."
-                )
-
-        if not user or not verify_password(password, user.password_hash):
-            # Track failed attempt
-            if user:
+            try:
                 redis = get_redis_client()
-                fail_key = f"login_fails:{user.id}"
-                attempts = await redis.incr(fail_key)
-                await redis.expire(fail_key, LOGIN_LOCKOUT_MINUTES * 60)
-                if attempts >= MAX_LOGIN_ATTEMPTS:
-                    lockout_key = f"login_lockout:{user.id}"
-                    await redis.set(lockout_key, "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+                lockout_key = f"login_lockout:{user.id}"
+                is_locked = await redis.get(lockout_key)
+                if is_locked:
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                         detail=f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes."
                     )
+            except HTTPException:
+                raise
+            except Exception as e:
+                # Do not crash the app if Redis limit is exceeded or offline
+                import logging
+                logging.error(f"Redis error checking lockout for {email}: {e}")
+
+        if not user or not verify_password(password, user.password_hash):
+            # Track failed attempt
+            if user:
+                try:
+                    redis = get_redis_client()
+                    fail_key = f"login_fails:{user.id}"
+                    attempts = await redis.incr(fail_key)
+                    await redis.expire(fail_key, LOGIN_LOCKOUT_MINUTES * 60)
+                    if attempts >= MAX_LOGIN_ATTEMPTS:
+                        lockout_key = f"login_lockout:{user.id}"
+                        await redis.set(lockout_key, "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+                        raise HTTPException(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail=f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes."
+                        )
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    import logging
+                    logging.error(f"Redis error tracking login failure for {email}: {e}")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
         # Clear failed attempts on successful login
-        redis = get_redis_client()
-        await redis.delete(f"login_fails:{user.id}")
+        try:
+            redis = get_redis_client()
+            await redis.delete(f"login_fails:{user.id}")
+        except Exception as e:
+            import logging
+            logging.error(f"Redis error clearing login fails for {email}: {e}")
 
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
@@ -114,5 +131,9 @@ class AuthService:
     @staticmethod
     async def invalidate_refresh_token(jti: str) -> None:
         """Blacklist a refresh token by its jti claim."""
-        redis = get_redis_client()
-        await redis.set(f"revoked_token:{jti}", "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+        try:
+            redis = get_redis_client()
+            await redis.set(f"revoked_token:{jti}", "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+        except Exception as e:
+            import logging
+            logging.error(f"Redis error invalidating refresh token {jti}: {e}")

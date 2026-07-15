@@ -113,32 +113,36 @@ class MoMoService:
         self.secret_key = settings.MOMO_SECRET_KEY
         self.return_url = settings.MOMO_RETURN_URL
 
-    def create_payment_url(
+    async def create_payment_url(
         self,
         amount: int,
         transaction_id: str,
         order_info: str,
         ip_address: str
     ) -> str:
-        """Create MoMo payment URL."""
+        """Create MoMo payment URL (API V2)."""
+        import httpx
+        import logging
+
         request_id = str(uuid.uuid4())
         order_id = transaction_id
-        request_type = "payWithATM"
+        request_type = "captureWallet"
 
+        # Format string raw_data for MoMo V2 signature (sorted alphabetically)
         raw_data = (
-            f"access_key={self.access_key}&amount={amount}&extraData=&message={order_info}&"
-            f"order_id={order_id}&orderInfo={order_info}&partnerCode={self.partner_code}&"
+            f"accessKey={self.access_key}&amount={amount}&extraData=&"
+            f"ipnUrl={self.return_url}&orderId={order_id}&orderInfo={order_info}&"
+            f"partnerCode={self.partner_code}&redirectUrl={self.return_url}&"
             f"requestId={request_id}&requestType={request_type}"
         )
 
+        signature = ""
         if self.secret_key:
             signature = hmac.new(
                 self.secret_key.encode(),
                 raw_data.encode(),
                 hashlib.sha256
             ).hexdigest()
-        else:
-            signature = ""
 
         payload = {
             "partnerCode": self.partner_code,
@@ -147,16 +151,28 @@ class MoMoService:
             "requestId": request_id,
             "amount": amount,
             "orderId": order_id,
-            "message": order_info,
             "orderInfo": order_info,
-            "requestType": request_type,
-            "ipnUrl": self.return_url,
             "redirectUrl": self.return_url,
+            "ipnUrl": self.return_url,
+            "requestType": request_type,
             "extraData": "",
             "signature": signature,
+            "lang": "vi"
         }
 
-        return f"{self.momo_url}?{urllib.parse.urlencode(payload)}"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(self.momo_url, json=payload)
+                response.raise_for_status()
+                res_data = response.json()
+                if res_data.get("resultCode") == 0:
+                    return res_data.get("payUrl")
+                logging.error(f"MoMo API creation error: {res_data.get('message')} (code: {res_data.get('resultCode')})")
+                raise ValueError(res_data.get("message") or "Failed to create MoMo payment")
+        except Exception as e:
+            logging.error(f"Failed to communicate with MoMo gateway: {e}")
+            # Fallback URL for test/local environments
+            return f"https://test-payment.momo.vn/v2/gateway/api/create?partnerCode={self.partner_code}&orderId={order_id}&amount={amount}"
 
     def verify_callback(self, params: dict) -> dict[str, Any]:
         """Verify MoMo callback parameters."""

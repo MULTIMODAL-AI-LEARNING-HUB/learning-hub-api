@@ -9,7 +9,7 @@ class EnrollmentBase(BaseModel):
 
 
 class PaymentIntentRequest(BaseModel):
-    payment_method: str = Field(pattern="^(vnpay|momo)$")
+    payment_method: str = Field(pattern="^(vnpay|momo|free)$")
 
 
 class PaymentIntentResponse(BaseModel):

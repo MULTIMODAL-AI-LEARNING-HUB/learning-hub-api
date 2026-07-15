@@ -122,7 +122,7 @@ async def create_payment_intent(
         )
     elif payload.payment_method == "momo":
         momo = get_momo_service()
-        payment_url = momo.create_payment_url(
+        payment_url = await momo.create_payment_url(
             amount=course.price_vnd,
             transaction_id=transaction_id,
             order_info=order_info,

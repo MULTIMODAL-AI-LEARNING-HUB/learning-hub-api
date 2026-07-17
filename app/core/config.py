@@ -3,6 +3,12 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+REQUIRED_CORS_ORIGINS = {
+    "https://learninghubs.tech",
+    "https://www.learninghubs.tech",
+}
+
+
 class Settings(BaseSettings):
     APP_NAME: str = "Learning Hub API"
     DEBUG: bool = False
@@ -47,24 +53,31 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    CORS_ORIGINS: Any = ["http://localhost:5173"]
-    FRONTEND_URL: str = "http://localhost:5173"
+    CORS_ORIGINS: Any = ["http://localhost:5173", *sorted(REQUIRED_CORS_ORIGINS)]
+    FRONTEND_URL: str = "https://learninghubs.tech"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> list[str]:
+        origins: list[str]
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
                 try:
                     import json
-                    return json.loads(v)
+                    origins = json.loads(v)
                 except Exception:
                     v = v[1:-1]
-            return [i.strip().strip("'\"") for i in v.split(",") if i.strip()]
+                    origins = [i.strip().strip("'\"") for i in v.split(",") if i.strip()]
+            else:
+                origins = [i.strip().strip("'\"") for i in v.split(",") if i.strip()]
         elif isinstance(v, list):
-            return v
-        raise ValueError(v)
+            origins = v
+        else:
+            raise ValueError(v)
+
+        normalized = {str(origin).rstrip("/") for origin in origins if origin}
+        return sorted(normalized | REQUIRED_CORS_ORIGINS)
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

@@ -45,5 +45,7 @@ async def list_messages(course_id: UUID, limit: int = 50, before: UUID | None = 
 async def create_message(course_id: UUID, payload: CourseChatMessageCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     await ensure_member(course_id, current_user, db)
     message = CourseChatMessage(course_id=course_id, sender_id=current_user.id, content=payload.content.strip())
-    db.add(message); await db.commit(); await db.refresh(message)
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
     return serialize(message, current_user)

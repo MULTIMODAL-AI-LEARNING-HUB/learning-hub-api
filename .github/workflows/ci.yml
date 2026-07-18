@@ -77,8 +77,7 @@ jobs:
           target: runner
           load: true
           tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/web
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Push Docker image to Heroku
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

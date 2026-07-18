@@ -17,6 +17,7 @@ from app.models.course_content import (
 from app.models.notification import Notification
 from app.models.wishlist import WishlistItem
 from app.models.announcement import Announcement
+from app.models.course_chat import CourseChatMessage
 
 __all__ = [
     "User",
@@ -47,4 +48,5 @@ __all__ = [
     "Notification",
     "WishlistItem",
     "Announcement",
+    "CourseChatMessage",
 ]

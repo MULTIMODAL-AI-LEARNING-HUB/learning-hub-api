@@ -13,6 +13,7 @@ from app.api.v1.wishlist import router as wishlist_router
 from app.api.v1.announcements import router as announcements_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.webhooks.payment_webhooks import router as payment_webhooks_router
+from app.api.v1.course_chat import router as course_chat_router
 
 api_router = APIRouter()
 
@@ -37,3 +38,4 @@ api_router.include_router(wishlist_router, prefix="/wishlist", tags=["wishlist"]
 api_router.include_router(announcements_router, tags=["announcements"])
 api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(payment_webhooks_router)
+api_router.include_router(course_chat_router)

@@ -18,4 +18,4 @@ RUN test -f /app/alembic/versions/c2d3e4f5a6b7_add_course_chat_messages.py \
     && test -f /app/alembic/versions/d3e4f5a6b7c8_add_social_chat_tables.py
 RUN alembic heads
 
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "python -m app.scripts.release_migrate && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT"]

@@ -19,6 +19,7 @@ from app.models import (  # noqa: F401
     Category, Course, CourseMaterial, Enrollment, MaterialProgress, Payment,
     Section, Lesson, Attachment, Quiz, Question, Answer,
     QuizAttempt, Assignment, AssignmentSubmission, Discussion, Review,
+    SocialChatRoom, SocialChatMember, SocialChatMessage,
 )
 from app.core.config import settings
 

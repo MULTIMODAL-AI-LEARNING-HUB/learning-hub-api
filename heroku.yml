@@ -3,5 +3,5 @@ build:
     web: Dockerfile
 release:
   command:
-    - alembic upgrade head
+    - python -m app.scripts.release_migrate
   image: web

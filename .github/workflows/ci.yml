@@ -79,10 +79,19 @@ jobs:
           tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/web
           no-cache: true
 
+      - name: Build Docker release image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.release
+          target: runner
+          load: true
+          tags: registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/release
+          no-cache: true
+
       - name: Push Docker image to Heroku
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          docker tag registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/web registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/release
           docker push registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/web
           docker push registry.heroku.com/${{ secrets.HEROKU_APP_NAME_API }}/release
 

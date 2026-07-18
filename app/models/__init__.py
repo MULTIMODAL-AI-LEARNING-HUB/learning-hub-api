@@ -18,6 +18,7 @@ from app.models.notification import Notification
 from app.models.wishlist import WishlistItem
 from app.models.announcement import Announcement
 from app.models.course_chat import CourseChatMessage
+from app.models.social_chat import SocialChatRoom, SocialChatMember, SocialChatMessage
 
 __all__ = [
     "User",
@@ -49,4 +50,7 @@ __all__ = [
     "WishlistItem",
     "Announcement",
     "CourseChatMessage",
+    "SocialChatRoom",
+    "SocialChatMember",
+    "SocialChatMessage",
 ]

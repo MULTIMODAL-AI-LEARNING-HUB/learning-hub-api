@@ -9,6 +9,9 @@ FROM python:3.10-slim AS runner
 
 WORKDIR /app
 COPY --from=builder /usr/local /usr/local
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY . .
 
 ENV PYTHONUNBUFFERED=1

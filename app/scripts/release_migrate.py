@@ -7,12 +7,15 @@ release.
 """
 
 import asyncio
+import logging
 
 from sqlalchemy import text
 
 from app.core.database import engine
 
 HEAD_REVISION = "d3e4f5a6b7c8"
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(message)s")
+logger = logging.getLogger(__name__)
 
 
 DDL_STATEMENTS = [
@@ -75,8 +78,12 @@ DDL_STATEMENTS = [
 
 async def main() -> None:
     async with engine.begin() as connection:
-        for statement in DDL_STATEMENTS:
+        await connection.execute(text("SET LOCAL lock_timeout = '5s'"))
+        await connection.execute(text("SET LOCAL statement_timeout = '30s'"))
+        for index, statement in enumerate(DDL_STATEMENTS, start=1):
+            logger.info("Running release migration statement %s/%s", index, len(DDL_STATEMENTS))
             await connection.execute(text(statement))
+        logger.info("Release migration repair completed at Alembic head %s", HEAD_REVISION)
     await engine.dispose()
 
 

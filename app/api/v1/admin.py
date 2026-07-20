@@ -325,18 +325,25 @@ async def health(
     except Exception:
         services["qdrant"] = "unhealthy"
 
-    # 6. Test Celery Worker — run blocking ping in thread pool to avoid blocking the async event loop
+    # 6. Test Celery Worker — 2-tier check:
+    #    Tier 1: verify broker (Redis) is reachable via CELERY_BROKER_URL
+    #    Tier 2: check if any worker processes are actually responding
     try:
-        from app.tasks.document_tasks import celery_app
-        loop = asyncio.get_event_loop()
-        insp = celery_app.control.inspect(timeout=3.0)
-        workers = await asyncio.wait_for(
-            loop.run_in_executor(None, insp.ping),
-            timeout=5.0,
-        )
-        services["celery"] = "healthy" if workers else "degraded"
-    except asyncio.TimeoutError:
-        services["celery"] = "degraded"
+        import redis as _redis
+        broker_url = settings.CELERY_BROKER_URL
+        _r = _redis.from_url(broker_url, socket_connect_timeout=3)
+        await asyncio.get_event_loop().run_in_executor(None, _r.ping)
+        # Broker reachable — now check for live workers (non-fatal if none found)
+        try:
+            from app.tasks.document_tasks import celery_app
+            insp = celery_app.control.inspect(timeout=3.0)
+            workers = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, insp.ping),
+                timeout=5.0,
+            )
+            services["celery"] = "healthy" if workers else "degraded"
+        except Exception:
+            services["celery"] = "degraded"
     except Exception:
         services["celery"] = "unhealthy"
 

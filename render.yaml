@@ -22,6 +22,11 @@ services:
           type: redis
           name: learning-hub-uat-redis
           property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: learning-hub-uat-redis
+          property: connectionString
       - key: AI_SERVICE_URL
         value: http://learning-hub-ai:8001
 

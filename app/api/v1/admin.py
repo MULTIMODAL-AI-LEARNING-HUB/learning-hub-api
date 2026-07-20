@@ -1,5 +1,6 @@
 """Admin API endpoints."""
 
+import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -324,12 +325,18 @@ async def health(
     except Exception:
         services["qdrant"] = "unhealthy"
 
-    # 6. Test Celery Worker
+    # 6. Test Celery Worker — run blocking ping in thread pool to avoid blocking the async event loop
     try:
         from app.tasks.document_tasks import celery_app
+        loop = asyncio.get_event_loop()
         insp = celery_app.control.inspect(timeout=3.0)
-        workers = insp.ping()
+        workers = await asyncio.wait_for(
+            loop.run_in_executor(None, insp.ping),
+            timeout=5.0,
+        )
         services["celery"] = "healthy" if workers else "degraded"
+    except asyncio.TimeoutError:
+        services["celery"] = "degraded"
     except Exception:
         services["celery"] = "unhealthy"
 

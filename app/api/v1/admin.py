@@ -327,7 +327,7 @@ async def health(
     # 6. Test Celery Worker
     try:
         from app.tasks.document_tasks import celery_app
-        insp = celery_app.control.inspect()
+        insp = celery_app.control.inspect(timeout=3.0)
         workers = insp.ping()
         services["celery"] = "healthy" if workers else "degraded"
     except Exception:

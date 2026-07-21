@@ -38,6 +38,78 @@ class UserRepository(BaseRepository):
         )
         return result.scalar_one()
 
+    async def find_or_create_social_user(
+        self,
+        email: str,
+        oauth_provider: str,
+        google_id: str | None = None,
+        facebook_id: str | None = None,
+        full_name: str | None = None,
+        avatar_url: str | None = None,
+    ) -> User:
+        user: User | None = None
+        if google_id:
+            result = await self.db.execute(
+                select(User).where(User.google_id == google_id).options(selectinload(User.quota))
+            )
+            user = result.scalar_one_or_none()
+        elif facebook_id:
+            result = await self.db.execute(
+                select(User).where(User.facebook_id == facebook_id).options(selectinload(User.quota))
+            )
+            user = result.scalar_one_or_none()
+
+        if not user:
+            user = await self.get_by_email(email)
+
+        if user:
+            changed = False
+            if google_id and not user.google_id:
+                user.google_id = google_id
+                changed = True
+            if facebook_id and not user.facebook_id:
+                user.facebook_id = facebook_id
+                changed = True
+            if not user.oauth_provider:
+                user.oauth_provider = oauth_provider
+                changed = True
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+                changed = True
+            if full_name and not user.full_name:
+                user.full_name = full_name
+                changed = True
+
+            if changed:
+                await self.db.commit()
+                result = await self.db.execute(
+                    select(User).where(User.id == user.id).options(selectinload(User.quota))
+                )
+                user = result.scalar_one()
+            return user
+        else:
+            from app.models.quota import Quota
+            quota = Quota(
+                storage_limit_mb=1024,
+                storage_used_mb=0,
+                video_limit=5,
+                video_used=0,
+                token_limit=50000,
+                token_used=0,
+            )
+            new_user = User(
+                email=email,
+                password_hash=None,
+                full_name=full_name,
+                avatar_url=avatar_url,
+                role="student",
+                oauth_provider=oauth_provider,
+                google_id=google_id,
+                facebook_id=facebook_id,
+                quota=quota,
+            )
+            return await self.create(new_user)
+
     async def count_all(self) -> int:
         from sqlalchemy import func
         result = await self.db.execute(select(func.count(User.id)))

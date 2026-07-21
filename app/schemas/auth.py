@@ -16,6 +16,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+
+class FacebookLoginRequest(BaseModel):
+    access_token: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -41,6 +49,7 @@ class AuthUserResponse(BaseModel):
     full_name: str | None = None
     avatar_url: str | None = None
     role: str
+    oauth_provider: str | None = None
     created_at: datetime | None = None
     quota: QuotaResponse | None = None
 

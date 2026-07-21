@@ -65,7 +65,7 @@ class AuthService:
                 import logging
                 logging.error(f"Redis error checking lockout for {email}: {e}")
 
-        if not user or not verify_password(password, user.password_hash):
+        if not user or not user.password_hash or not verify_password(password, user.password_hash):
             # Track failed attempt
             if user:
                 try:
@@ -94,6 +94,124 @@ class AuthService:
         except Exception as e:
             import logging
             logging.error(f"Redis error clearing login fails for {email}: {e}")
+
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
+        return user
+
+    async def google_login(self, token_str: str) -> User:
+        import httpx
+        from app.core.config import settings
+
+        email = None
+        google_id = None
+        full_name = None
+        avatar_url = None
+
+        # 1. Try decoding as Google ID token (JWT)
+        if "." in token_str and not token_str.startswith("ya29."):
+            try:
+                from google.oauth2 import id_token
+                from google.auth.transport import requests as google_requests
+
+                audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
+                id_info = id_token.verify_oauth2_token(
+                    token_str,
+                    google_requests.Request(),
+                    audience=audience
+                )
+                email = id_info.get("email")
+                google_id = id_info.get("sub")
+                full_name = id_info.get("name")
+                avatar_url = id_info.get("picture")
+            except Exception as e:
+                import logging
+                logging.warning(f"Google ID token verification failed, trying userinfo endpoint: {e}")
+
+        # 2. Fallback: try Google Userinfo API (for Google OAuth Access Token)
+        if not email:
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        "https://www.googleapis.com/oauth2/v3/userinfo",
+                        headers={"Authorization": f"Bearer {token_str}"},
+                        timeout=10.0
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        email = data.get("email")
+                        google_id = data.get("sub")
+                        full_name = data.get("name")
+                        avatar_url = data.get("picture")
+            except Exception as e:
+                import logging
+                logging.error(f"Google Userinfo API request failed: {e}")
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Google token or email not available"
+            )
+
+        user = await self.repo.find_or_create_social_user(
+            email=email,
+            oauth_provider="google",
+            google_id=google_id,
+            full_name=full_name,
+            avatar_url=avatar_url,
+        )
+
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
+        return user
+
+    async def facebook_login(self, access_token: str) -> User:
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    "https://graph.facebook.com/me",
+                    params={
+                        "fields": "id,name,email,picture.type(large)",
+                        "access_token": access_token
+                    },
+                    timeout=10.0
+                )
+                if resp.status_code != 200:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid Facebook access token"
+                    )
+                fb_data = resp.json()
+        except HTTPException:
+            raise
+        except Exception as e:
+            import logging
+            logging.error(f"Facebook Graph API request failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to verify Facebook token"
+            )
+
+        facebook_id = fb_data.get("id")
+        email = fb_data.get("email")
+        # If email is missing (e.g. registered with phone number on Facebook), fallback to pseudo email
+        if not email:
+            email = f"fb_{facebook_id}@facebook.user"
+
+        full_name = fb_data.get("name")
+        avatar_url = None
+        picture_data = fb_data.get("picture", {}).get("data", {})
+        if isinstance(picture_data, dict):
+            avatar_url = picture_data.get("url")
+
+        user = await self.repo.find_or_create_social_user(
+            email=email,
+            oauth_provider="facebook",
+            facebook_id=facebook_id,
+            full_name=full_name,
+            avatar_url=avatar_url,
+        )
 
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")

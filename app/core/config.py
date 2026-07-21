@@ -41,8 +41,6 @@ class Settings(BaseSettings):
     REDIS_CACHE_TTL_ENROLLMENTS: int = 60
     REDIS_CACHE_TTL_ANNOUNCEMENTS: int = 120
     REDIS_CACHE_TTL_LESSONS: int = 120
-    AI_SERVICE_TIMEOUT: int = 60
-
     RATE_LIMIT_AUTH: str = "500/minute"
     RATE_LIMIT_CHAT: str = "30/minute"
     RATE_LIMIT_UPLOAD: str = "5/minute"
@@ -52,6 +50,13 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # OAuth Settings
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    FACEBOOK_APP_ID: str = ""
+    FACEBOOK_APP_SECRET: str = ""
+
 
     CORS_ORIGINS: Any = ["http://localhost:5173", *sorted(REQUIRED_CORS_ORIGINS)]
     FRONTEND_URL: str = "https://learninghubs.tech"

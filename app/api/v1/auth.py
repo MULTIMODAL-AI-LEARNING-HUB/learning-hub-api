@@ -13,7 +13,9 @@ from app.core.security import decode_token
 from app.schemas import (
     AuthResponse,
     AuthUserResponse,
+    FacebookLoginRequest,
     ForgotPasswordRequest,
+    GoogleLoginRequest,
     LoginRequest,
     MessageResponse,
     RefreshRequest,
@@ -49,6 +51,7 @@ def _build_user_response(user: User) -> AuthUserResponse:
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         role=user.role,
+        oauth_provider=user.oauth_provider,
         created_at=user.created_at,
         quota=quota_resp,
     )
@@ -82,6 +85,42 @@ async def login(
     """Authenticate credentials and return JWT tokens."""
     service = AuthService(UserRepository(db))
     user = await service.authenticate(payload.email, payload.password)
+    access_token = service.build_access_token(user.id, user.token_version or 0)
+    refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
+    return AuthResponse(
+        user=_build_user_response(user),
+        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    )
+
+
+@router.post("/google", response_model=AuthResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def google_login(
+    request: Request,
+    payload: GoogleLoginRequest,
+    db: AsyncSession = Depends(get_db)
+) -> AuthResponse:
+    """Authenticate via Google ID token, creating or updating user, and returning JWT tokens."""
+    service = AuthService(UserRepository(db))
+    user = await service.google_login(payload.id_token)
+    access_token = service.build_access_token(user.id, user.token_version or 0)
+    refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
+    return AuthResponse(
+        user=_build_user_response(user),
+        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    )
+
+
+@router.post("/facebook", response_model=AuthResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def facebook_login(
+    request: Request,
+    payload: FacebookLoginRequest,
+    db: AsyncSession = Depends(get_db)
+) -> AuthResponse:
+    """Authenticate via Facebook access token, creating or updating user, and returning JWT tokens."""
+    service = AuthService(UserRepository(db))
+    user = await service.facebook_login(payload.access_token)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
     return AuthResponse(

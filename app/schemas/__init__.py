@@ -1,7 +1,9 @@
 from app.schemas.auth import (
     AuthResponse,
     AuthUserResponse,
+    FacebookLoginRequest,
     ForgotPasswordRequest,
+    GoogleLoginRequest,
     LoginRequest,
     MessageResponse,
     RefreshRequest,
@@ -76,7 +78,9 @@ __all__ = [
     # Auth
     "AuthResponse",
     "AuthUserResponse",
+    "FacebookLoginRequest",
     "ForgotPasswordRequest",
+    "GoogleLoginRequest",
     "LoginRequest",
     "MessageResponse",
     "RefreshRequest",

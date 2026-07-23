@@ -106,6 +106,7 @@ class Settings(BaseSettings):
         return v
 
     AI_SERVICE_URL: str = "http://localhost:8001"
+    AI_SERVICE_TIMEOUT: float = 30.0
     INTERNAL_API_KEY: str = ""
 
     SMTP_HOST: str = "localhost"

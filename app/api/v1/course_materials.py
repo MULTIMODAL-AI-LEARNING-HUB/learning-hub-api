@@ -3,22 +3,22 @@
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients.minio_client import MinioClient
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.db import get_db
-from app.models.user import User
 from app.models.course_material import CourseMaterial
-from app.repositories.course_repo import CourseRepository
+from app.models.user import User
 from app.repositories.course_material_repo import CourseMaterialRepository
+from app.repositories.course_repo import CourseRepository
 from app.schemas import (
     CourseMaterialListResponse,
     CourseMaterialResponse,
     CourseMaterialUpdate,
 )
 from app.services.course_service import CourseService
-from app.clients.minio_client import MinioClient
 
 router = APIRouter(prefix="/{course_id}/materials", tags=["course-materials"])
 

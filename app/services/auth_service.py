@@ -4,12 +4,16 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password
 from app.core.cache import get_redis_client
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    verify_password,
+)
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.services.email_service import EmailService
-
 
 RESET_TOKEN_EXPIRE_MINUTES = 30
 MAX_LOGIN_ATTEMPTS = 5
@@ -101,6 +105,7 @@ class AuthService:
 
     async def google_login(self, token_str: str) -> User:
         import httpx
+
         from app.core.config import settings
 
         email = None
@@ -111,8 +116,8 @@ class AuthService:
         # 1. Try decoding as Google ID token (JWT)
         if "." in token_str and not token_str.startswith("ya29."):
             try:
-                from google.oauth2 import id_token
                 from google.auth.transport import requests as google_requests
+                from google.oauth2 import id_token
 
                 audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
                 id_info = id_token.verify_oauth2_token(

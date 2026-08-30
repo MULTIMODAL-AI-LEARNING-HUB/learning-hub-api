@@ -1,3 +1,11 @@
+from app.schemas.admin import (
+    AdminCourseListResponse,
+    AdminCourseResponse,
+    AdminUserCreate,
+    AdminUserListResponse,
+    AdminUserResponse,
+    AdminUserUpdate,
+)
 from app.schemas.auth import (
     AuthResponse,
     AuthUserResponse,
@@ -12,11 +20,11 @@ from app.schemas.auth import (
     TokenResponse,
     UpdateProfileRequest,
 )
-from app.schemas.documents import (
-    DocumentListResponse,
-    DocumentResponse,
-    DocumentUploadRequest,
-    DocumentUploadResponse,
+from app.schemas.category import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryTreeResponse,
+    CategoryUpdate,
 )
 from app.schemas.chat import (
     ChatAskRequest,
@@ -26,12 +34,6 @@ from app.schemas.chat import (
     ChatSessionListItem,
     ChatSessionListResponse,
     ChatSessionResponse,
-)
-from app.schemas.category import (
-    CategoryCreate,
-    CategoryResponse,
-    CategoryTreeResponse,
-    CategoryUpdate,
 )
 from app.schemas.course import (
     CourseCreate,
@@ -46,6 +48,18 @@ from app.schemas.course_material import (
     CourseMaterialResponse,
     CourseMaterialUpdate,
 )
+from app.schemas.dashboard import (
+    DashboardActivity,
+    DashboardCourseProgress,
+    DashboardResponse,
+    DashboardStats,
+)
+from app.schemas.documents import (
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentUploadRequest,
+    DocumentUploadResponse,
+)
 from app.schemas.enrollment import (
     EnrollmentListResponse,
     EnrollmentResponse,
@@ -58,20 +72,6 @@ from app.schemas.progress import (
     EnrollmentProgressResponse,
     MaterialProgressResponse,
     MaterialProgressUpdate,
-)
-from app.schemas.admin import (
-    AdminUserCreate,
-    AdminUserUpdate,
-    AdminUserResponse,
-    AdminUserListResponse,
-    AdminCourseResponse,
-    AdminCourseListResponse,
-)
-from app.schemas.dashboard import (
-    DashboardResponse,
-    DashboardCourseProgress,
-    DashboardStats,
-    DashboardActivity,
 )
 
 __all__ = [

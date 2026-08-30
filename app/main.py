@@ -2,22 +2,24 @@
 
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
-from app.core.config import settings
 from app.api.v1 import api_router
+from app.clients.ai_client import close_ai_client, get_ai_client
 
 # Lifespan singletons
-from app.core.cache import get_redis_client, close_redis
-from app.clients.ai_client import get_ai_client, close_ai_client
+from app.core.cache import close_redis, get_redis_client
+from app.core.config import settings
 
 # Rate limiting
 from app.core.limiter import limiter, rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

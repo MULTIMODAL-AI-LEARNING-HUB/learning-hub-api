@@ -2,9 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+
+# Core/Limiter imports
+from app.core.limiter import limiter
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.essay import EssaySubmission
@@ -15,18 +19,14 @@ from app.schemas.study import (
     EssayResponse,
     EssaySubmitRequest,
     FlashcardGenerateRequest,
-    FlashcardResponse,
     FlashcardItemResponse,
-    QuizGenerateRequest,
+    FlashcardResponse,
     QuizGenerateByCourseRequest,
+    QuizGenerateRequest,
     QuizJobResponse,
-    QuizSubmitRequest,
     QuizResultResponse,
+    QuizSubmitRequest,
 )
-
-# Core/Limiter imports
-from app.core.limiter import limiter
-from app.core.config import settings
 
 router = APIRouter()
 

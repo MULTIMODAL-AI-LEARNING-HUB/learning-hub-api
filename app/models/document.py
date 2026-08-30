@@ -1,15 +1,17 @@
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from sqlalchemy import String, BigInteger, DateTime, ForeignKey
+from uuid import UUID, uuid4
+
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
-    from app.models.flashcard import Flashcard
     from app.models.essay import EssaySubmission
+    from app.models.flashcard import Flashcard
+    from app.models.user import User
 
 class Document(Base):
     __tablename__ = "documents"

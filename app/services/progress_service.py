@@ -3,9 +3,9 @@
 from uuid import UUID
 
 from app.models.material_progress import MaterialProgress
-from app.repositories.progress_repo import ProgressRepository
 from app.repositories.course_material_repo import CourseMaterialRepository
 from app.repositories.enrollment_repo import EnrollmentRepository
+from app.repositories.progress_repo import ProgressRepository
 
 
 class ProgressService:

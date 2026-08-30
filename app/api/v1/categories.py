@@ -5,7 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.auth import require_admin, get_current_user
+from app.core.cache import RedisCache
+from app.core.config import settings
+from app.dependencies.auth import get_current_user, require_admin
 from app.dependencies.db import get_db
 from app.models.user import User
 from app.repositories.category_repo import CategoryRepository
@@ -16,8 +18,6 @@ from app.schemas import (
     CategoryUpdate,
 )
 from app.services.category_service import CategoryService
-from app.core.cache import RedisCache
-from app.core.config import settings
 
 router = APIRouter()
 

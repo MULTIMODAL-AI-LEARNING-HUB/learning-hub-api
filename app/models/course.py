@@ -1,18 +1,20 @@
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
-from sqlalchemy import String, Text, DateTime, ForeignKey, Integer
+from uuid import UUID, uuid4
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.models.announcement import Announcement
     from app.models.category import Category
-    from app.models.course_material import CourseMaterial
-    from app.models.enrollment import Enrollment
     from app.models.chat import ChatSession
     from app.models.course_content import Section
-    from app.models.announcement import Announcement
+    from app.models.course_material import CourseMaterial
+    from app.models.enrollment import Enrollment
+    from app.models.user import User
 
 
 class Course(Base):

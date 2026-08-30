@@ -1,14 +1,16 @@
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from sqlalchemy import DateTime, ForeignKey, Integer, Boolean
+from uuid import UUID, uuid4
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.enrollment import Enrollment
     from app.models.course_material import CourseMaterial
+    from app.models.enrollment import Enrollment
 
 
 class MaterialProgress(Base):

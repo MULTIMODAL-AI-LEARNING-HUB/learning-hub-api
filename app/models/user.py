@@ -1,20 +1,22 @@
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime
+from uuid import UUID, uuid4
+
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.document import Document
     from app.models.chat import ChatSession
-    from app.models.flashcard import Flashcard
-    from app.models.essay import EssaySubmission
-    from app.models.quota import Quota
     from app.models.course import Course
-    from app.models.enrollment import Enrollment
     from app.models.course_content import AssignmentSubmission, Discussion
+    from app.models.document import Document
+    from app.models.enrollment import Enrollment
+    from app.models.essay import EssaySubmission
+    from app.models.flashcard import Flashcard
     from app.models.notification import Notification
+    from app.models.quota import Quota
 
 class User(Base):
     __tablename__ = "users"

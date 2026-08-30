@@ -1,15 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from uuid import UUID
 from typing import List
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Lesson, Section, Discussion, Course
-from app.schemas.course_content import DiscussionCreate, DiscussionUpdate, DiscussionResponse
 from app.dependencies.auth import get_current_user
+from app.models import Course, Discussion, Lesson, Section
 from app.models.user import User
+from app.schemas.course_content import (
+    DiscussionCreate,
+    DiscussionResponse,
+    DiscussionUpdate,
+)
 
 router = APIRouter(prefix="/lessons/{lesson_id}/discussions", tags=["Discussions"])
 

@@ -1,15 +1,17 @@
-from uuid import UUID, uuid4
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional, List
-from sqlalchemy import String, Text, DateTime, ForeignKey, Integer, Boolean, BigInteger
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.database import Base
 import enum
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, List, Optional
+from uuid import UUID, uuid4
+
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.course import Course
-    from app.models.user import User
     from app.models.enrollment import Enrollment
+    from app.models.user import User
 
 
 class LessonType(str, enum.Enum):

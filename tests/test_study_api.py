@@ -1,5 +1,6 @@
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_quiz_generate_unauthorized(client):
     response = await client.post(

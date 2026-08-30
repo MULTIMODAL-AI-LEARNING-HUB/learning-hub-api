@@ -2,7 +2,9 @@
 
 from io import BytesIO
 from typing import Optional
+
 from minio import Minio
+
 from app.core.config import settings
 
 _minio_client: Optional[Minio] = None

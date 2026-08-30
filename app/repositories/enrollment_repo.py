@@ -2,11 +2,11 @@
 
 from uuid import UUID
 
-from sqlalchemy import select, delete, func, and_
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import selectinload
 
-from app.models.enrollment import Enrollment
 from app.models.course import Course
+from app.models.enrollment import Enrollment
 from app.repositories.base import BaseRepository
 
 

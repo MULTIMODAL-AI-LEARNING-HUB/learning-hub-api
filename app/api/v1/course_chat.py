@@ -1,4 +1,5 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,11 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import Course, Enrollment, User
 from app.models.course_chat import CourseChatMessage
-from app.schemas.course_chat import CourseChatMessageCreate, CourseChatMessageResponse, CourseChatMessagesResponse
+from app.schemas.course_chat import (
+    CourseChatMessageCreate,
+    CourseChatMessageResponse,
+    CourseChatMessagesResponse,
+)
 
 router = APIRouter(prefix="/courses/{course_id}/chat", tags=["course-chat"])
 

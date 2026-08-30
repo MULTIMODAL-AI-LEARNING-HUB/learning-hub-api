@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+
 from app.models.essay import EssaySubmission
 from app.models.flashcard import Flashcard, FlashcardItem
 from app.repositories.base import BaseRepository

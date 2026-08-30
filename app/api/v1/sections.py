@@ -1,18 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from uuid import UUID
 from typing import List
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Section, Course
-from app.schemas.course_content import (
-    SectionCreate, SectionUpdate, SectionResponse, SectionWithLessons,
-    ReorderSections
-)
 from app.dependencies.auth import get_current_user, require_lecturer
+from app.models import Course, Section
 from app.models.user import User
+from app.schemas.course_content import (
+    ReorderSections,
+    SectionCreate,
+    SectionResponse,
+    SectionUpdate,
+    SectionWithLessons,
+)
 
 router = APIRouter(prefix="/courses/{course_id}/sections", tags=["Sections"])
 

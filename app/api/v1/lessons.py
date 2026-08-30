@@ -1,22 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from uuid import UUID
 import uuid
 from typing import List
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.database import get_db
-from app.models import Section, Lesson, Attachment, Course
-from app.schemas.course_content import (
-    LessonCreate, LessonUpdate, LessonResponse, LessonWithContent,
-    AttachmentResponse, AttachmentCreate, ReorderLessons
-)
-from app.dependencies.auth import get_current_user, require_lecturer
-from app.models.user import User
+from app.clients.minio_client import MinioClient
 from app.core.cache import RedisCache
 from app.core.config import settings
-from app.clients.minio_client import MinioClient
+from app.core.database import get_db
+from app.dependencies.auth import get_current_user, require_lecturer
+from app.models import Attachment, Course, Lesson, Section
+from app.models.user import User
+from app.schemas.course_content import (
+    AttachmentCreate,
+    AttachmentResponse,
+    LessonCreate,
+    LessonResponse,
+    LessonUpdate,
+    LessonWithContent,
+    ReorderLessons,
+)
 
 router = APIRouter(prefix="/sections/{section_id}/lessons", tags=["Lessons"])
 

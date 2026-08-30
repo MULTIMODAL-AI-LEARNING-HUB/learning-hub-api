@@ -1,9 +1,9 @@
 """Material progress repository."""
 
-from uuid import UUID
 from datetime import datetime, timezone
+from uuid import UUID
 
-from sqlalchemy import select, delete, func, and_
+from sqlalchemy import and_, delete, func, select
 
 from app.models.material_progress import MaterialProgress
 from app.repositories.base import BaseRepository

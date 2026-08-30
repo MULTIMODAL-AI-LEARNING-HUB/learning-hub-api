@@ -2,14 +2,17 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import RedisCache
+from app.core.config import settings
+from app.core.limiter import limiter
+from app.core.security import decode_token
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
-from app.core.security import decode_token
 from app.schemas import (
     AuthResponse,
     AuthUserResponse,
@@ -25,10 +28,6 @@ from app.schemas import (
     UpdateProfileRequest,
 )
 from app.services.auth_service import AuthService
-
-from app.core.limiter import limiter
-from app.core.config import settings
-from app.core.cache import RedisCache
 
 router = APIRouter()
 

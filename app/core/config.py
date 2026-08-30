@@ -1,7 +1,7 @@
 from typing import Any
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 REQUIRED_CORS_ORIGINS = {
     "https://learninghubs.tech",
@@ -94,7 +94,7 @@ class Settings(BaseSettings):
                 v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
             
             # Strip 'pgbouncer' query parameter as asyncpg doesn't support it
-            from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+            from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
             try:
                 parsed = urlparse(v)
                 if parsed.query:

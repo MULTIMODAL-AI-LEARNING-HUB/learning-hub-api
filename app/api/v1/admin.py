@@ -4,29 +4,28 @@ import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
+from app.clients.ai_client import get_ai_client
+from app.core.cache import RedisCache, get_redis_client
+from app.core.config import settings
+from app.core.limiter import limiter
+from app.core.security import hash_password
 from app.dependencies.auth import require_admin
 from app.dependencies.db import get_db
-from app.models.user import User
 from app.models.document import Document
 from app.models.enrollment import Enrollment
-from app.repositories.user_repo import UserRepository
+from app.models.user import User
 from app.repositories.course_repo import CourseRepository
+from app.repositories.user_repo import UserRepository
 from app.schemas.admin import (
-    AdminUserCreate,
-    AdminUserUpdate,
-    AdminUserResponse,
-    AdminCourseResponse,
     AdminCourseListResponse,
+    AdminCourseResponse,
+    AdminUserCreate,
+    AdminUserResponse,
+    AdminUserUpdate,
 )
-
-from app.core.limiter import limiter
-from app.core.config import settings
-from app.core.cache import RedisCache, get_redis_client
-from app.core.security import hash_password
-from app.clients.ai_client import get_ai_client
 from app.utils.pagination import build_pagination
 
 router = APIRouter()

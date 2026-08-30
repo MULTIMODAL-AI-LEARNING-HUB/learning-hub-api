@@ -4,9 +4,15 @@ import logging
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients.minio_client import MinioClient
+from app.core.cache import RedisCache
+from app.core.config import settings
+
+# Core/Client integrations
+from app.core.limiter import limiter
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.document import Document
@@ -15,12 +21,6 @@ from app.repositories.document_repo import DocumentRepository
 from app.schemas import DocumentListResponse, DocumentResponse, DocumentUploadResponse
 from app.tasks.document_tasks import dispatch_process_document
 from app.utils.pagination import build_pagination
-
-# Core/Client integrations
-from app.core.limiter import limiter
-from app.core.cache import RedisCache
-from app.clients.minio_client import MinioClient
-from app.core.config import settings
 
 router = APIRouter()
 

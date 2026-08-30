@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select, delete, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from app.models.chat import ChatMessage, ChatSession

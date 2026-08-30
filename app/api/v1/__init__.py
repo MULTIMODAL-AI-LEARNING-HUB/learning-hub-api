@@ -1,20 +1,30 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, documents, chat, study, admin, categories, courses, enrollments, progress
-from app.api.v1.course_materials import router as course_materials_router
-from app.api.v1.sections import router as sections_router
-from app.api.v1.lessons import router as lessons_router
-from app.api.v1.quizzes import router as quizzes_router
-from app.api.v1.assignments import router as assignments_router
-from app.api.v1.discussions import router as discussions_router
-from app.api.v1.reviews import router as reviews_router
-from app.api.v1.notifications import router as notifications_router
-from app.api.v1.wishlist import router as wishlist_router
+from app.api.v1 import (
+    admin,
+    auth,
+    categories,
+    chat,
+    courses,
+    documents,
+    enrollments,
+    progress,
+    study,
+)
 from app.api.v1.announcements import router as announcements_router
-from app.api.v1.dashboard import router as dashboard_router
-from app.webhooks.payment_webhooks import router as payment_webhooks_router
+from app.api.v1.assignments import router as assignments_router
 from app.api.v1.course_chat import router as course_chat_router
+from app.api.v1.course_materials import router as course_materials_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.discussions import router as discussions_router
+from app.api.v1.lessons import router as lessons_router
+from app.api.v1.notifications import router as notifications_router
+from app.api.v1.quizzes import router as quizzes_router
+from app.api.v1.reviews import router as reviews_router
+from app.api.v1.sections import router as sections_router
 from app.api.v1.social_chat import router as social_chat_router
+from app.api.v1.wishlist import router as wishlist_router
+from app.webhooks.payment_webhooks import router as payment_webhooks_router
 
 api_router = APIRouter()
 

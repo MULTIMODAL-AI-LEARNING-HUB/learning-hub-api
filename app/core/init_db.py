@@ -1,10 +1,13 @@
 import asyncio
 import os
+
 from sqlalchemy.future import select
+
 from app.core.database import async_session_factory
 from app.core.security import hash_password
-from app.models.user import User
 from app.models.quota import Quota
+from app.models.user import User
+
 
 async def init_db() -> None:
     async with async_session_factory() as session:

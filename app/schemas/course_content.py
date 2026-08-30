@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Any
-from uuid import UUID
 from datetime import datetime
+from typing import Any, List, Optional
+from uuid import UUID
 
+from pydantic import BaseModel, Field
 
 # ============ SECTION SCHEMAS ============
 

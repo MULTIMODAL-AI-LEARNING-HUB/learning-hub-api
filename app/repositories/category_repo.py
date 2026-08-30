@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from app.models.category import Category

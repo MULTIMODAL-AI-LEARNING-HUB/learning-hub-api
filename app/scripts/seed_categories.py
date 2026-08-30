@@ -28,8 +28,9 @@ def slugify(name: str) -> str:
 
 if __name__ == "__main__":
     import asyncio
-    import asyncpg
     import os
+
+    import asyncpg
 
     DATABASE_URL = os.getenv(
         "DATABASE_URL",

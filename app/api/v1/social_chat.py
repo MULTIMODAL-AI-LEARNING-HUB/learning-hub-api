@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import User
-from app.models.social_chat import SocialChatMember, SocialChatMessage, SocialChatRoom, utc_now_naive
+from app.models.social_chat import (
+    SocialChatMember,
+    SocialChatMessage,
+    SocialChatRoom,
+    utc_now_naive,
+)
 from app.schemas.social_chat import (
     SocialChatMessageCreate,
     SocialChatMessageResponse,

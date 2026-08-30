@@ -3,9 +3,9 @@
 import hashlib
 import hmac
 import urllib.parse
+import uuid
 from datetime import datetime, timezone
 from typing import Any
-import uuid
 
 from app.core.config import settings
 
@@ -121,8 +121,9 @@ class MoMoService:
         ip_address: str
     ) -> str:
         """Create MoMo payment URL (API V2)."""
-        import httpx
         import logging
+
+        import httpx
 
         request_id = str(uuid.uuid4())
         order_id = transaction_id

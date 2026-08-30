@@ -1,22 +1,45 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from uuid import UUID
-from typing import List
 from datetime import datetime
+from typing import List
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Lesson, Section, Quiz, Question, Answer, Course, Enrollment, QuizAttempt
-from app.schemas.course_content import (
-    QuizCreate, QuizUpdate, QuizResponse, QuizWithQuestions,
-    QuestionCreate, QuestionUpdate, QuestionResponse,
-    AnswerCreate, AnswerUpdate, AnswerResponse,
-    QuizAttemptSubmit, QuizAttemptResponse, QuizAttemptResult,
-    ReorderQuestions
+from app.dependencies.auth import (
+    get_current_user,
+    require_active_user,
+    require_lecturer,
 )
-from app.dependencies.auth import get_current_user, require_lecturer, require_active_user
+from app.models import (
+    Answer,
+    Course,
+    Enrollment,
+    Lesson,
+    Question,
+    Quiz,
+    QuizAttempt,
+    Section,
+)
 from app.models.user import User
+from app.schemas.course_content import (
+    AnswerCreate,
+    AnswerResponse,
+    AnswerUpdate,
+    QuestionCreate,
+    QuestionResponse,
+    QuestionUpdate,
+    QuizAttemptResponse,
+    QuizAttemptResult,
+    QuizAttemptSubmit,
+    QuizCreate,
+    QuizResponse,
+    QuizUpdate,
+    QuizWithQuestions,
+    ReorderQuestions,
+)
 
 router = APIRouter(prefix="/lessons/{lesson_id}/quiz", tags=["Quizzes"])
 

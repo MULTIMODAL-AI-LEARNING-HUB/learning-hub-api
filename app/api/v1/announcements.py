@@ -1,15 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from uuid import UUID
 from typing import List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from uuid import UUID
 
-from app.core.database import get_db
-from app.models import Announcement, Course, User
-from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
-from app.dependencies.auth import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.cache import RedisCache
 from app.core.config import settings
+from app.core.database import get_db
+from app.dependencies.auth import get_current_user
+from app.models import Announcement, Course, User
+from app.schemas.announcement import (
+    AnnouncementCreate,
+    AnnouncementResponse,
+    AnnouncementUpdate,
+)
 
 router = APIRouter(prefix="/courses/{course_id}/announcements", tags=["announcements"])
 

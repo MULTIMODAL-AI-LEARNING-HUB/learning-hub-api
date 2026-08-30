@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select, delete, func
+from sqlalchemy import delete, func, select
 
 from app.models.course_material import CourseMaterial
 from app.repositories.base import BaseRepository

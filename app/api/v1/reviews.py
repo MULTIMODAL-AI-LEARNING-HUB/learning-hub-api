@@ -1,14 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.core.database import get_db
+from app.dependencies.auth import (
+    get_current_user,
+    require_active_user,
+    require_lecturer,
+)
 from app.models import Course, Enrollment, Review
-from app.schemas.course_content import ReviewCreate, ReviewUpdate, ReviewResponse, LecturerReply
-from app.dependencies.auth import get_current_user, require_lecturer, require_active_user
 from app.models.user import User
+from app.schemas.course_content import (
+    LecturerReply,
+    ReviewCreate,
+    ReviewResponse,
+    ReviewUpdate,
+)
 
 router = APIRouter(prefix="/{course_id}/reviews", tags=["Reviews"])
 

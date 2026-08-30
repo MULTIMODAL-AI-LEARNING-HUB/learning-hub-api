@@ -1,7 +1,8 @@
 """Task helpers for quiz generation."""
 
-from fastapi import HTTPException, status
 from celery.result import AsyncResult
+from fastapi import HTTPException, status
+
 from app.tasks.document_tasks import celery_app
 
 

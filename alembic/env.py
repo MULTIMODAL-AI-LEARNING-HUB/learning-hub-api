@@ -1,5 +1,10 @@
 import asyncio
+
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+import sys
 from logging.config import fileConfig
+from os.path import abspath, dirname
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -7,21 +12,40 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
-import sys
-from os.path import abspath, dirname
 sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
+from app.core.config import settings
 from app.core.database import Base
 from app.models import (  # noqa: F401
-    User, Document, ChatSession, ChatMessage, Flashcard, FlashcardItem, EssaySubmission, Quota,
-    Category, Course, CourseMaterial, Enrollment, MaterialProgress, Payment,
-    Section, Lesson, Attachment, Quiz, Question, Answer,
-    QuizAttempt, Assignment, AssignmentSubmission, Discussion, Review,
-    SocialChatRoom, SocialChatMember, SocialChatMessage,
+    Answer,
+    Assignment,
+    AssignmentSubmission,
+    Attachment,
+    Category,
+    ChatMessage,
+    ChatSession,
+    Course,
+    CourseMaterial,
+    Discussion,
+    Document,
+    Enrollment,
+    EssaySubmission,
+    Flashcard,
+    FlashcardItem,
+    Lesson,
+    MaterialProgress,
+    Payment,
+    Question,
+    Quiz,
+    QuizAttempt,
+    Quota,
+    Review,
+    Section,
+    SocialChatMember,
+    SocialChatMessage,
+    SocialChatRoom,
+    User,
 )
-from app.core.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

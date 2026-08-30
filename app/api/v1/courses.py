@@ -5,11 +5,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import RedisCache
+from app.core.config import settings
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.db import get_db
 from app.models.user import User
-from app.repositories.course_repo import CourseRepository
 from app.repositories.course_material_repo import CourseMaterialRepository
+from app.repositories.course_repo import CourseRepository
 from app.repositories.enrollment_repo import EnrollmentRepository
 from app.schemas import (
     CourseCreate,
@@ -20,8 +22,6 @@ from app.schemas import (
 )
 from app.services.course_service import CourseService
 from app.utils.pagination import build_pagination
-from app.core.cache import RedisCache
-from app.core.config import settings
 
 router = APIRouter()
 
@@ -133,6 +133,7 @@ async def get_lecturer_stats(
 ):
     """Retrieve statistics for the lecturer's dashboard."""
     from sqlalchemy import select
+
     from app.models.course import Course
     from app.models.enrollment import Enrollment
 

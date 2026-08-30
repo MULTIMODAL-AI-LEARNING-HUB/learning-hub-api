@@ -1,13 +1,13 @@
 """Enrollment service."""
 
-from uuid import UUID
 from datetime import datetime, timezone
+from uuid import UUID
 
 from app.models.enrollment import Enrollment
 from app.models.payment import Payment
+from app.repositories.course_repo import CourseRepository
 from app.repositories.enrollment_repo import EnrollmentRepository
 from app.repositories.payment_repo import PaymentRepository
-from app.repositories.course_repo import CourseRepository
 
 
 class EnrollmentService:

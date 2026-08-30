@@ -1,8 +1,10 @@
 """AI service HTTP client."""
 
 from typing import Any, Optional
+
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from app.core.config import settings
 
 # Global client instances for pool reuse

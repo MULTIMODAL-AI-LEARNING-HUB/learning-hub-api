@@ -2,14 +2,17 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.ai_client import AiClient
+from app.core.cache import RedisCache
+from app.core.config import settings
+from app.core.limiter import limiter
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
-from app.models.user import User
 from app.models.chat import ChatSession
+from app.models.user import User
 from app.repositories.chat_repo import ChatRepository
 from app.repositories.course_repo import CourseRepository
 from app.repositories.enrollment_repo import EnrollmentRepository
@@ -24,9 +27,6 @@ from app.schemas import (
 )
 from app.services.chat_service import ChatService
 from app.utils.pagination import build_pagination
-from app.core.limiter import limiter
-from app.core.cache import RedisCache
-from app.core.config import settings
 
 router = APIRouter()
 

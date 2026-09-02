@@ -12,6 +12,11 @@ from app.core.cache import RedisCache
 from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_lecturer
+from app.dependencies.course_auth import (
+    get_section_with_course,
+    verify_course_ownership,
+    verify_lesson_access,
+)
 from app.models import Attachment, Course, Lesson, Section
 from app.models.user import User
 from app.schemas.course_content import (
@@ -23,23 +28,9 @@ from app.schemas.course_content import (
     LessonWithContent,
     ReorderLessons,
 )
+from app.utils.upload import read_upload_file_safely, sanitize_filename
 
 router = APIRouter(prefix="/sections/{section_id}/lessons", tags=["Lessons"])
-
-
-async def get_section_with_course(db: AsyncSession, section_id: UUID) -> tuple[Section, Course]:
-    result = await db.execute(
-        select(Section).where(Section.id == section_id).options(selectinload(Section.course))
-    )
-    section = result.scalar_one_or_none()
-    if not section:
-        raise HTTPException(status_code=404, detail="Section not found")
-    return section, section.course
-
-
-async def verify_course_ownership(course: Course, current_user: User) -> None:
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized to modify this course")
 
 
 @router.get("", response_model=List[LessonResponse])
@@ -132,19 +123,13 @@ async def get_lesson(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    cache = RedisCache()
-    cache_key = RedisCache.cache_key_lesson(lesson_id)
-    cached = await cache.get(cache_key)
-    if cached:
-        return LessonWithContent(**cached)
-
     section, course = await get_section_with_course(db, section_id)
 
     result = await db.execute(
         select(Lesson)
         .where(Lesson.id == lesson_id, Lesson.section_id == section_id)
         .options(
-            selectinload(Lesson.quiz).selectinload(Lesson.questions).selectinload(Lesson.answers),
+            selectinload(Lesson.quiz),
             selectinload(Lesson.assignment),
             selectinload(Lesson.attachments)
         )
@@ -152,6 +137,9 @@ async def get_lesson(
     lesson = result.scalar_one_or_none()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
+
+    # Enforce access control (preview or active course enrollment)
+    await verify_lesson_access(lesson, course, current_user, db)
 
     # Generate presigned URLs for video_url and attachments
     if lesson.video_url and lesson.video_url.startswith("s3://"):
@@ -168,9 +156,6 @@ async def get_lesson(
                 except Exception:
                     pass
 
-    from fastapi.encoders import jsonable_encoder
-    lesson_data = jsonable_encoder(lesson)
-    await cache.set(cache_key, lesson_data, ttl=settings.REDIS_CACHE_TTL_LESSONS)
     return lesson
 
 
@@ -266,6 +251,10 @@ async def list_attachments(
     current_user: User = Depends(get_current_user)
 ):
     section, course = await get_section_with_course(db, section_id)
+    lesson = (await db.execute(select(Lesson).where(Lesson.id == lesson_id, Lesson.section_id == section_id))).scalar_one_or_none()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    await verify_lesson_access(lesson, course, current_user, db)
 
     result = await db.execute(
         select(Attachment).where(Attachment.lesson_id == lesson_id).order_by(Attachment.uploaded_at.desc())
@@ -336,16 +325,14 @@ async def upload_lesson_attachment(
     section, course = await get_section_with_course(db, section_id)
     await verify_course_ownership(course, current_user)
 
-    content = await file.read()
-    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    filename = sanitize_filename(file.filename)
+    ext = filename.split(".")[-1].lower() if "." in filename else "bin"
 
     # Security: validate file type and size
     allowed_exts = {"pdf", "doc", "docx", "png", "jpg", "jpeg", "mp4", "webm", "mp3", "txt", "zip"}
     if ext not in allowed_exts:
         raise HTTPException(status_code=400, detail=f"File type '.{ext}' not allowed. Allowed: {', '.join(sorted(allowed_exts))}")
-    max_size = 50 * 1024 * 1024  # 50MB
-    if len(content) > max_size:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size is 50MB")
+    content = await read_upload_file_safely(file, max_size_bytes=50 * 1024 * 1024)
     
     # Structured key: materials/{course_id}/{lesson_id}/{uuid}.{ext}
     minio_key = f"materials/{course.id}/{lesson_id}/{uuid.uuid4()}.{ext}"

@@ -9,6 +9,7 @@ from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.user import User
 from app.repositories.course_material_repo import CourseMaterialRepository
+from app.repositories.course_repo import CourseRepository
 from app.repositories.enrollment_repo import EnrollmentRepository
 from app.repositories.progress_repo import ProgressRepository
 from app.schemas import (
@@ -46,7 +47,12 @@ async def get_enrollment_progress(
     if not enrollment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
 
-    if enrollment.student_id != current_user.id and current_user.role not in ("admin", "lecturer"):
+    if current_user.role == "lecturer":
+        course_repo = CourseRepository(db)
+        course = await course_repo.get_by_id(enrollment.course_id)
+        if not course or course.lecturer_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view progress for this course")
+    elif current_user.role != "admin" and enrollment.student_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     progress_repo = ProgressRepository(db)

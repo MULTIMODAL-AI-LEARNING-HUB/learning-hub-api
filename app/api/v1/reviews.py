@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.dependencies.auth import (
@@ -11,6 +12,7 @@ from app.dependencies.auth import (
     require_active_user,
     require_lecturer,
 )
+from app.dependencies.course_auth import get_course_or_404, verify_course_ownership
 from app.models import Course, Enrollment, Review
 from app.models.user import User
 from app.schemas.course_content import (
@@ -21,19 +23,6 @@ from app.schemas.course_content import (
 )
 
 router = APIRouter(prefix="/{course_id}/reviews", tags=["Reviews"])
-
-
-async def get_course_or_404(db: AsyncSession, course_id: UUID) -> Course:
-    result = await db.execute(select(Course).where(Course.id == course_id))
-    course = result.scalar_one_or_none()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
-async def verify_course_ownership(course: Course, current_user: User) -> None:
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
 
 
 @router.get("")
@@ -59,6 +48,7 @@ async def list_reviews(
         select(Review)
         .join(Enrollment)
         .where(Enrollment.course_id == course_id)
+        .options(selectinload(Review.enrollment).selectinload(Enrollment.student))
         .order_by(Review.created_at.desc())
         .offset(offset)
         .limit(page_size)
@@ -67,22 +57,18 @@ async def list_reviews(
 
     items = []
     for r in reviews:
-        enrollment_result = await db.execute(select(Enrollment).where(Enrollment.id == r.enrollment_id))
-        enrollment = enrollment_result.scalar_one_or_none()
-        if enrollment:
-            student_result = await db.execute(select(User).where(User.id == enrollment.student_id))
-            student = student_result.scalar_one_or_none()
-            items.append({
-                "id": r.id,
-                "enrollment_id": r.enrollment_id,
-                "rating": r.rating,
-                "comment": r.comment,
-                "lecturer_reply": r.lecturer_reply,
-                "replied_at": r.replied_at,
-                "created_at": r.created_at,
-                "student_name": student.full_name if student else None,
-                "course_title": course.title
-            })
+        student = r.enrollment.student if r.enrollment else None
+        items.append({
+            "id": r.id,
+            "enrollment_id": r.enrollment_id,
+            "rating": r.rating,
+            "comment": r.comment,
+            "lecturer_reply": r.lecturer_reply,
+            "replied_at": r.replied_at,
+            "created_at": r.created_at,
+            "student_name": student.full_name if student else None,
+            "course_title": course.title
+        })
     return {"items": items, "total": total}
 
 
@@ -237,10 +223,16 @@ async def lecturer_reply_review(
     course = await get_course_or_404(db, course_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Review).where(Review.id == review_id))
+    # Secure: Verify review belongs to this course and eager-load student
+    result = await db.execute(
+        select(Review)
+        .join(Enrollment)
+        .where(Review.id == review_id, Enrollment.course_id == course_id)
+        .options(selectinload(Review.enrollment).selectinload(Enrollment.student))
+    )
     review = result.scalar_one_or_none()
     if not review:
-        raise HTTPException(status_code=404, detail="Review not found")
+        raise HTTPException(status_code=404, detail="Review not found for this course")
 
     review.lecturer_reply = reply_data.reply
     review.replied_at = datetime.now()
@@ -248,12 +240,7 @@ async def lecturer_reply_review(
     await db.commit()
     await db.refresh(review)
 
-    enrollment_result = await db.execute(select(Enrollment).where(Enrollment.id == review.enrollment_id))
-    enrollment = enrollment_result.scalar_one_or_none()
-    student = None
-    if enrollment:
-        student_result = await db.execute(select(User).where(User.id == enrollment.student_id))
-        student = student_result.scalar_one_or_none()
+    student = review.enrollment.student if review.enrollment else None
 
     return {
         "id": review.id,

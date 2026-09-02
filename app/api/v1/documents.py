@@ -21,6 +21,7 @@ from app.repositories.document_repo import DocumentRepository
 from app.schemas import DocumentListResponse, DocumentResponse, DocumentUploadResponse
 from app.tasks.document_tasks import dispatch_process_document
 from app.utils.pagination import build_pagination
+from app.utils.upload import read_upload_file_safely, sanitize_filename
 
 router = APIRouter()
 
@@ -57,7 +58,7 @@ async def upload(
 ) -> DocumentUploadResponse:
     """Upload a document to MinIO and trigger processing worker."""
     # 1. Extension & Format validation
-    filename = file.filename or "uploaded_file"
+    filename = sanitize_filename(file.filename)
     ext = filename.split(".")[-1].lower() if "." in filename else ""
     allowed_exts = {"pdf", "mp4", "mp3", "webm"}
     if ext not in allowed_exts:
@@ -66,8 +67,8 @@ async def upload(
             detail=f"Unsupported file format: .{ext}. Allowed: PDF, MP4, MP3, WebM."
         )
 
-    # 2. File size calculation & Quota validation
-    content = await file.read()
+    # 2. File size calculation & Quota validation (100MB hard limit per file)
+    content = await read_upload_file_safely(file, max_size_bytes=100 * 1024 * 1024)
     file_size_bytes = len(content)
     file_size_mb = file_size_bytes / (1024 * 1024)
 

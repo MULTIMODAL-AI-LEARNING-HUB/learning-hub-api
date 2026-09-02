@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_lecturer
+from app.dependencies.course_auth import get_course_or_404, verify_course_ownership
 from app.models import Course, Section
 from app.models.user import User
 from app.schemas.course_content import (
@@ -19,19 +20,6 @@ from app.schemas.course_content import (
 )
 
 router = APIRouter(prefix="/courses/{course_id}/sections", tags=["Sections"])
-
-
-async def get_course_or_404(db: AsyncSession, course_id: UUID) -> Course:
-    result = await db.execute(select(Course).where(Course.id == course_id))
-    course = result.scalar_one_or_none()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
-async def verify_course_ownership(course: Course, current_user: User) -> None:
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized to modify this course")
 
 
 @router.get("", response_model=List[SectionWithLessons])

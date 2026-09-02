@@ -4,11 +4,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.cache import RedisCache
 from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.course_auth import (
+    get_course_or_404,
+    verify_course_access,
+    verify_course_ownership,
+)
 from app.models import Announcement, Course, User
 from app.schemas.announcement import (
     AnnouncementCreate,
@@ -19,50 +25,43 @@ from app.schemas.announcement import (
 router = APIRouter(prefix="/courses/{course_id}/announcements", tags=["announcements"])
 
 
-async def get_course_or_404(db: AsyncSession, course_id: UUID) -> Course:
-    result = await db.execute(select(Course).where(Course.id == course_id))
-    course = result.scalar_one_or_none()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
 @router.get("", response_model=List[AnnouncementResponse])
 async def list_announcements(
     course_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    cache = RedisCache()
-    cache_key = RedisCache.cache_key_announcements(course_id)
-    cached = await cache.get(cache_key)
-    if cached:
-        return [AnnouncementResponse(**a) for a in cached]
+    course = await get_course_or_404(db, course_id)
+    has_access = await verify_course_access(course, current_user, db)
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active enrollment required to access course announcements"
+        )
 
-    await get_course_or_404(db, course_id)
+    # Eager load lecturer to eliminate N+1 queries
     query = (
         select(Announcement)
         .where(Announcement.course_id == course_id)
+        .options(selectinload(Announcement.lecturer))
         .order_by(Announcement.created_at.desc())
     )
     result = await db.execute(query)
     announcements = result.scalars().all()
 
-    response = []
-    for a in announcements:
-        user_result = await db.execute(select(User).where(User.id == a.lecturer_id))
-        lecturer = user_result.scalar_one_or_none()
-        response.append(AnnouncementResponse(
+    response = [
+        AnnouncementResponse(
             id=a.id,
             course_id=a.course_id,
             lecturer_id=a.lecturer_id,
-            lecturer_name=lecturer.full_name if lecturer else None,
+            lecturer_name=a.lecturer.full_name if a.lecturer else None,
             title=a.title,
             content=a.content,
             created_at=a.created_at,
             updated_at=a.updated_at,
-        ))
-    await cache.set(cache_key, [r.model_dump(mode="json") for r in response], ttl=settings.REDIS_CACHE_TTL_ANNOUNCEMENTS)
+        )
+        for a in announcements
+    ]
     return response
 
 
@@ -74,8 +73,7 @@ async def create_announcement(
     current_user: User = Depends(get_current_user),
 ):
     course = await get_course_or_404(db, course_id)
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only the course lecturer can create announcements")
+    await verify_course_ownership(course, current_user)
 
     announcement = Announcement(
         course_id=course_id,
@@ -108,15 +106,17 @@ async def update_announcement(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    course = await get_course_or_404(db, course_id)
+    await verify_course_ownership(course, current_user)
+
     result = await db.execute(
-        select(Announcement).where(Announcement.id == announcement_id, Announcement.course_id == course_id)
+        select(Announcement)
+        .where(Announcement.id == announcement_id, Announcement.course_id == course_id)
+        .options(selectinload(Announcement.lecturer))
     )
     announcement = result.scalar_one_or_none()
     if not announcement:
         raise HTTPException(status_code=404, detail="Announcement not found")
-
-    if announcement.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
 
     if data.title is not None:
         announcement.title = data.title
@@ -126,15 +126,12 @@ async def update_announcement(
     await db.commit()
     await db.refresh(announcement)
 
-    user_result = await db.execute(select(User).where(User.id == announcement.lecturer_id))
-    lecturer = user_result.scalar_one_or_none()
-
     await RedisCache().delete_pattern(f"cache:announcements:{course_id}")
     return AnnouncementResponse(
         id=announcement.id,
         course_id=announcement.course_id,
         lecturer_id=announcement.lecturer_id,
-        lecturer_name=lecturer.full_name if lecturer else None,
+        lecturer_name=announcement.lecturer.full_name if announcement.lecturer else current_user.full_name,
         title=announcement.title,
         content=announcement.content,
         created_at=announcement.created_at,
@@ -149,15 +146,15 @@ async def delete_announcement(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    course = await get_course_or_404(db, course_id)
+    await verify_course_ownership(course, current_user)
+
     result = await db.execute(
         select(Announcement).where(Announcement.id == announcement_id, Announcement.course_id == course_id)
     )
     announcement = result.scalar_one_or_none()
     if not announcement:
         raise HTTPException(status_code=404, detail="Announcement not found")
-
-    if announcement.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
 
     await db.delete(announcement)
     await db.commit()

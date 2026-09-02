@@ -154,7 +154,7 @@ async def confirm_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> EnrollmentResponse:
-    """Confirm payment and activate enrollment."""
+    """Confirm payment and activate enrollment with cryptographic signature verification."""
     course_repo = CourseRepository(db)
     enrollment_repo = EnrollmentRepository(db)
     payment_repo = PaymentRepository(db)
@@ -168,11 +168,35 @@ async def confirm_payment(
     if payment.student_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
+    if payment.status == "completed":
+        enrollment = await enrollment_repo.get_by_id(payment.enrollment_id)
+        if enrollment:
+            return _to_response(enrollment)
+
     payment_status = "completed"
     if payload.payment_data:
-        response_code = payload.payment_data.get("vnp_ResponseCode") or payload.payment_data.get("resultCode")
-        if response_code != "0" and str(response_code) != "0":
+        if "vnp_SecureHash" in payload.payment_data:
+            vnpay = get_vnpay_service()
+            verify_res = vnpay.verify_return(payload.payment_data)
+            if not verify_res.get("is_valid") or not verify_res.get("is_success"):
+                payment_status = "failed"
+        elif "signature" in payload.payment_data:
+            momo = get_momo_service()
+            verify_res = momo.verify_callback(payload.payment_data)
+            if not verify_res.get("is_valid") or not verify_res.get("is_success"):
+                payment_status = "failed"
+        else:
             payment_status = "failed"
+    else:
+        # Require signature verification for all paid transactions
+        if payment.amount_vnd > 0:
+            payment_status = "failed"
+
+    if payment_status == "failed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment verification failed: invalid signature or unconfirmed transaction"
+        )
 
     enrollment, _ = await enrollment_service.confirm_payment(payload.transaction_id, payment_status)
 

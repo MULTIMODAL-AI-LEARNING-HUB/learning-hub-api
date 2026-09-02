@@ -219,6 +219,37 @@ class QuestionWithAnswers(QuestionResponse):
     answers: List["AnswerResponse"] = []
 
 
+# ============ STUDENT QUIZ SCHEMAS (SECURE - NO CORRECT ANSWERS) ============
+
+class AnswerStudentResponse(BaseModel):
+    id: UUID
+    question_id: UUID
+    answer_text: str
+    order_index: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionStudentResponse(BaseModel):
+    id: UUID
+    quiz_id: UUID
+    question_text: str
+    type: str
+    points: int
+    order_index: int
+    created_at: datetime
+    answers: List[AnswerStudentResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class QuizStudentResponse(QuizResponse):
+    questions: List[QuestionStudentResponse] = []
+
+
 # ============ QUIZ ATTEMPT SCHEMAS ============
 
 class QuizAttemptStart(BaseModel):
@@ -444,3 +475,4 @@ class PaginatedResponse(BaseModel):
 SectionWithLessons.model_rebuild()
 LessonWithContent.model_rebuild()
 QuizWithQuestions.model_rebuild()
+QuizStudentResponse.model_rebuild()

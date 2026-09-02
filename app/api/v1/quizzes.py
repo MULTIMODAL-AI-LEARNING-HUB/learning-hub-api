@@ -13,6 +13,11 @@ from app.dependencies.auth import (
     require_active_user,
     require_lecturer,
 )
+from app.dependencies.course_auth import (
+    get_lesson_with_course,
+    verify_course_ownership,
+    verify_lesson_access,
+)
 from app.models import (
     Answer,
     Course,
@@ -27,15 +32,18 @@ from app.models.user import User
 from app.schemas.course_content import (
     AnswerCreate,
     AnswerResponse,
+    AnswerStudentResponse,
     AnswerUpdate,
     QuestionCreate,
     QuestionResponse,
+    QuestionStudentResponse,
     QuestionUpdate,
     QuizAttemptResponse,
     QuizAttemptResult,
     QuizAttemptSubmit,
     QuizCreate,
     QuizResponse,
+    QuizStudentResponse,
     QuizUpdate,
     QuizWithQuestions,
     ReorderQuestions,
@@ -44,30 +52,16 @@ from app.schemas.course_content import (
 router = APIRouter(prefix="/lessons/{lesson_id}/quiz", tags=["Quizzes"])
 
 
-async def get_lesson_with_course(db: AsyncSession, lesson_id: UUID) -> tuple[Lesson, Course]:
-    result = await db.execute(
-        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Section.course))
-    )
-    lesson = result.scalar_one_or_none()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="Lesson not found")
-    return lesson, lesson.section.course
-
-
-async def verify_course_ownership(course: Course, current_user: User) -> None:
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-
 # ============ QUIZ ROUTES ============
 
-@router.get("", response_model=QuizWithQuestions)
+@router.get("", response_model=QuizWithQuestions | QuizStudentResponse)
 async def get_quiz(
     lesson_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
 
     result = await db.execute(
         select(Quiz)
@@ -77,7 +71,51 @@ async def get_quiz(
     quiz = result.scalar_one_or_none()
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
-    return quiz
+
+    is_privileged = current_user.role == "admin" or course.lecturer_id == current_user.id
+    if is_privileged:
+        return quiz
+
+    # Omit correct answers for students to prevent cheating
+    student_questions = []
+    for q in quiz.questions:
+        student_answers = [
+            AnswerStudentResponse(
+                id=a.id,
+                question_id=a.question_id,
+                answer_text=a.answer_text,
+                order_index=a.order_index,
+                created_at=a.created_at,
+            )
+            for a in q.answers
+        ]
+        student_questions.append(
+            QuestionStudentResponse(
+                id=q.id,
+                quiz_id=q.quiz_id,
+                question_text=q.question_text,
+                type=q.type,
+                points=q.points,
+                order_index=q.order_index,
+                created_at=q.created_at,
+                answers=student_answers,
+            )
+        )
+
+    return QuizStudentResponse(
+        id=quiz.id,
+        lesson_id=quiz.lesson_id,
+        title=quiz.title,
+        description=quiz.description,
+        passing_score=quiz.passing_score,
+        duration_mins=quiz.duration_mins,
+        max_attempts=quiz.max_attempts,
+        is_active=quiz.is_active,
+        question_count=len(student_questions),
+        created_at=quiz.created_at,
+        updated_at=quiz.updated_at,
+        questions=student_questions,
+    )
 
 
 @router.post("", response_model=QuizResponse, status_code=status.HTTP_201_CREATED)

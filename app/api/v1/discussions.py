@@ -6,8 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.cache import RedisCache
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.course_auth import get_lesson_with_course, verify_lesson_access
 from app.models import Course, Discussion, Lesson, Section
 from app.models.user import User
 from app.schemas.course_content import (
@@ -19,41 +21,35 @@ from app.schemas.course_content import (
 router = APIRouter(prefix="/lessons/{lesson_id}/discussions", tags=["Discussions"])
 
 
-async def get_lesson_with_course(db: AsyncSession, lesson_id: UUID) -> tuple[Lesson, Course]:
-    result = await db.execute(
-        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Section.course))
-    )
-    lesson = result.scalar_one_or_none()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="Lesson not found")
-    return lesson, lesson.section.course
-
-
 @router.get("", response_model=List[DiscussionResponse])
 async def list_discussions(
     lesson_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
+
+    # Eager load Discussion.user and replies.user to completely eliminate N+1 queries
     result = await db.execute(
         select(Discussion)
         .where(Discussion.lesson_id == lesson_id, Discussion.parent_id.is_(None))
-        .options(selectinload(Discussion.replies))
+        .options(
+            selectinload(Discussion.user),
+            selectinload(Discussion.replies).selectinload(Discussion.user)
+        )
         .order_by(Discussion.is_pinned.desc(), Discussion.created_at.desc())
     )
     discussions = result.scalars().all()
 
     response = []
     for d in discussions:
-        user_result = await db.execute(select(User).where(User.id == d.user_id))
-        user = user_result.scalar_one_or_none()
         reply_count = len(d.replies) if d.replies else 0
 
         replies_response = []
         if d.replies:
             for r in d.replies:
-                reply_user_result = await db.execute(select(User).where(User.id == r.user_id))
-                reply_user = reply_user_result.scalar_one_or_none()
+                reply_user = r.user
                 replies_response.append({
                     "id": r.id,
                     "lesson_id": r.lesson_id,
@@ -75,8 +71,8 @@ async def list_discussions(
             "id": d.id,
             "lesson_id": d.lesson_id,
             "user_id": d.user_id,
-            "user_name": user.full_name if user else None,
-            "user_avatar": user.avatar_url if user else None,
+            "user_name": d.user.full_name if d.user else None,
+            "user_avatar": d.user.avatar_url if d.user else None,
             "parent_id": d.parent_id,
             "content": d.content,
             "is_pinned": d.is_pinned,
@@ -196,7 +192,20 @@ async def upvote_discussion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(Discussion).where(Discussion.id == post_id))
+    cache = RedisCache()
+    upvote_key = f"upvote:{post_id}:{current_user.id}"
+    already_upvoted = await cache.get(upvote_key)
+    if already_upvoted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already upvoted this post"
+        )
+
+    result = await db.execute(
+        select(Discussion)
+        .where(Discussion.id == post_id)
+        .options(selectinload(Discussion.user))
+    )
     discussion = result.scalar_one_or_none()
     if not discussion:
         raise HTTPException(status_code=404, detail="Discussion not found")
@@ -204,16 +213,14 @@ async def upvote_discussion(
     discussion.upvotes += 1
     await db.commit()
     await db.refresh(discussion)
-
-    user_result = await db.execute(select(User).where(User.id == discussion.user_id))
-    user = user_result.scalar_one_or_none()
+    await cache.set(upvote_key, True, ttl=86400 * 30)
 
     return {
         "id": discussion.id,
         "lesson_id": discussion.lesson_id,
         "user_id": discussion.user_id,
-        "user_name": user.full_name if user else None,
-        "user_avatar": user.avatar_url if user else None,
+        "user_name": discussion.user.full_name if discussion.user else None,
+        "user_avatar": discussion.user.avatar_url if discussion.user else None,
         "parent_id": discussion.parent_id,
         "content": discussion.content,
         "is_pinned": discussion.is_pinned,

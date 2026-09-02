@@ -25,6 +25,12 @@ class AuthService:
         self.repo = repo
 
     async def register(self, email: str, password: str, full_name: str | None, role: str = "student") -> User:
+        if role not in ("student", "lecturer"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Registration only allows 'student' or 'lecturer' roles"
+            )
+
         existing = await self.repo.get_by_email(email)
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")

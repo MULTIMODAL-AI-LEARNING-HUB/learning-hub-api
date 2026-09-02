@@ -8,6 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.minio_client import MinioClient
 from app.dependencies.auth import get_current_user, require_lecturer
+from app.dependencies.course_auth import (
+    get_course_or_404,
+    verify_course_access,
+    verify_course_ownership,
+)
 from app.dependencies.db import get_db
 from app.models.course_material import CourseMaterial
 from app.models.user import User
@@ -19,6 +24,7 @@ from app.schemas import (
     CourseMaterialUpdate,
 )
 from app.services.course_service import CourseService
+from app.utils.upload import read_upload_file_safely, sanitize_filename
 
 router = APIRouter(prefix="/{course_id}/materials", tags=["course-materials"])
 
@@ -56,13 +62,14 @@ async def list_materials(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> CourseMaterialListResponse:
-    """List all materials for a course."""
-    course_repo = CourseRepository(db)
-    course_service = CourseService(course_repo)
-
-    course = await course_service.get_by_id(course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    """List all materials for a course. Requires enrollment or ownership for paid courses."""
+    course = await get_course_or_404(db, course_id)
+    has_access = await verify_course_access(course, current_user, db)
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active enrollment required to access course materials"
+        )
 
     repo = CourseMaterialRepository(db)
     materials = await repo.list_by_course(course_id)
@@ -82,17 +89,10 @@ async def upload_material(
     current_user: User = Depends(require_lecturer),
 ) -> CourseMaterialResponse:
     """Upload a material to a course. Lecturer or Admin only."""
-    course_repo = CourseRepository(db)
-    course_service = CourseService(course_repo)
+    course = await get_course_or_404(db, course_id)
+    await verify_course_ownership(course, current_user)
 
-    course = await course_service.get_by_id(course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-
-    filename = file.filename or "uploaded_file"
+    filename = sanitize_filename(file.filename)
     ext = filename.split(".")[-1].lower() if "." in filename else ""
     allowed_exts = {"pdf", "doc", "docx", "png", "jpg", "jpeg", "mp4", "webm"}
     if ext not in allowed_exts:
@@ -101,7 +101,7 @@ async def upload_material(
             detail=f"Unsupported file format: .{ext}. Allowed: PDF, DOC, DOCX, PNG, JPG, MP4, WebM."
         )
 
-    content = await file.read()
+    content = await read_upload_file_safely(file, max_size_bytes=100 * 1024 * 1024)
     file_size_bytes = len(content)
 
     minio_key = f"course_materials/{course_id}/{uuid.uuid4()}.{ext}"
@@ -152,15 +152,8 @@ async def add_external_url(
     current_user: User = Depends(require_lecturer),
 ) -> CourseMaterialResponse:
     """Add an external URL as course material. Lecturer or Admin only."""
-    course_repo = CourseRepository(db)
-    course_service = CourseService(course_repo)
-
-    course = await course_service.get_by_id(course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    course = await get_course_or_404(db, course_id)
+    await verify_course_ownership(course, current_user)
 
     repo = CourseMaterialRepository(db)
     material = CourseMaterial(
@@ -185,15 +178,8 @@ async def update_material(
     current_user: User = Depends(require_lecturer),
 ) -> CourseMaterialResponse:
     """Update a material. Lecturer or Admin only."""
-    course_repo = CourseRepository(db)
-    course_service = CourseService(course_repo)
-
-    course = await course_service.get_by_id(course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    course = await get_course_or_404(db, course_id)
+    await verify_course_ownership(course, current_user)
 
     repo = CourseMaterialRepository(db)
     material = await repo.get_by_id(material_id)
@@ -219,15 +205,8 @@ async def delete_material(
     current_user: User = Depends(require_lecturer),
 ) -> None:
     """Delete a material. Lecturer or Admin only."""
-    course_repo = CourseRepository(db)
-    course_service = CourseService(course_repo)
-
-    course = await course_service.get_by_id(course_id)
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    course = await get_course_or_404(db, course_id)
+    await verify_course_ownership(course, current_user)
 
     repo = CourseMaterialRepository(db)
     material = await repo.get_by_id(material_id)

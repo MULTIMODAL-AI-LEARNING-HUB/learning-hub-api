@@ -58,21 +58,23 @@ class VNPayService:
         return payment_url
 
     def verify_return(self, params: dict) -> dict[str, Any]:
-        """Verify VNPay return/callback parameters."""
-        secure_hash = params.pop("vnp_SecureHash", "")
+        """Verify VNPay return/callback parameters using constant-time digest comparison."""
+        params_copy = dict(params)
+        secure_hash = params_copy.pop("vnp_SecureHash", "")
+        params_copy.pop("vnp_SecureHashType", None)
 
-        if self.hash_secret:
-            sorted_params = dict(sorted(params.items()))
+        if self.hash_secret and secure_hash:
+            sorted_params = dict(sorted(params_copy.items()))
             query_string = urllib.parse.urlencode(sorted_params)
             expected_hash = hmac.new(
                 self.hash_secret.encode(),
                 query_string.encode(),
                 hashlib.sha256
             ).hexdigest()
+            is_valid = hmac.compare_digest(str(secure_hash).lower(), str(expected_hash).lower())
         else:
-            expected_hash = secure_hash
+            is_valid = False
 
-        is_valid = secure_hash == expected_hash
         response_code = params.get("vnp_ResponseCode", "99")
 
         return {
@@ -176,7 +178,7 @@ class MoMoService:
             return f"https://test-payment.momo.vn/v2/gateway/api/create?partnerCode={self.partner_code}&orderId={order_id}&amount={amount}"
 
     def verify_callback(self, params: dict) -> dict[str, Any]:
-        """Verify MoMo callback parameters."""
+        """Verify MoMo callback parameters using constant-time digest comparison."""
         received_signature = params.get("signature", "")
 
         raw_data = (
@@ -188,16 +190,16 @@ class MoMoService:
             f"transId={params.get('transId')}"
         )
 
-        if self.secret_key:
+        if self.secret_key and received_signature:
             expected_signature = hmac.new(
                 self.secret_key.encode(),
                 raw_data.encode(),
                 hashlib.sha256
             ).hexdigest()
+            is_valid = hmac.compare_digest(str(received_signature).lower(), str(expected_signature).lower())
         else:
-            expected_signature = received_signature
+            is_valid = False
 
-        is_valid = received_signature == expected_signature
         result_code = params.get("resultCode", 99)
 
         return {

@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 from typing import List
@@ -14,6 +15,11 @@ from app.dependencies.auth import (
     get_current_user,
     require_active_user,
     require_lecturer,
+)
+from app.dependencies.course_auth import (
+    get_lesson_with_course,
+    verify_course_ownership,
+    verify_lesson_access,
 )
 from app.models import (
     Assignment,
@@ -32,23 +38,9 @@ from app.schemas.course_content import (
     SubmissionGrade,
     SubmissionResponse,
 )
+from app.utils.upload import read_upload_file_safely, sanitize_filename
 
 router = APIRouter(prefix="/lessons/{lesson_id}/assignment", tags=["Assignments"])
-
-
-async def get_lesson_with_course(db: AsyncSession, lesson_id: UUID) -> tuple[Lesson, Course]:
-    result = await db.execute(
-        select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.section).selectinload(Section.course))
-    )
-    lesson = result.scalar_one_or_none()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="Lesson not found")
-    return lesson, lesson.section.course
-
-
-async def verify_course_ownership(course: Course, current_user: User) -> None:
-    if course.lecturer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
 
 
 def _parse_and_presign_attachments(attachments_str: str | None) -> list:
@@ -201,16 +193,14 @@ async def upload_submission_file(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    content = await file.read()
-    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    filename = sanitize_filename(file.filename)
+    ext = filename.split(".")[-1].lower() if "." in filename else "bin"
 
     # Security: validate file type and size
     allowed_exts = {"pdf", "doc", "docx", "png", "jpg", "jpeg", "txt", "zip"}
     if ext not in allowed_exts:
         raise HTTPException(status_code=400, detail=f"File type '.{ext}' not allowed. Allowed: {', '.join(sorted(allowed_exts))}")
-    max_size = 20 * 1024 * 1024  # 20MB
-    if len(content) > max_size:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size is 20MB")
+    content = await read_upload_file_safely(file, max_size_bytes=20 * 1024 * 1024)
     
     # Key: submissions/{assignment_id}/{student_id}/{uuid}.{ext}
     minio_key = f"submissions/{assignment.id}/{current_user.id}/{uuid.uuid4()}.{ext}"
@@ -225,7 +215,7 @@ async def upload_submission_file(
         presigned_url = storage_uri
 
     return {
-        "file_name": file.filename,
+        "file_name": filename,
         "file_url": presigned_url,
         "file_type": file.content_type,
         "file_size": len(content),
@@ -280,7 +270,7 @@ async def create_submission(
         assignment_id=assignment.id,
         student_id=current_user.id,
         submission_text=submission_data.submission_text,
-        attachments=str(submission_data.attachments) if submission_data.attachments else None,
+        attachments=json.dumps(submission_data.attachments) if submission_data.attachments else None,
         is_late=is_late
     )
     db.add(submission)
@@ -316,26 +306,25 @@ async def get_my_submissions(
     if not assignment:
         return []
 
-    # Security: only return current user's submissions
+    # Security: only return current user's submissions, joined with User to avoid N+1 queries
     submissions_result = await db.execute(
-        select(AssignmentSubmission)
+        select(AssignmentSubmission, User)
+        .outerjoin(User, User.id == AssignmentSubmission.student_id)
         .where(
             AssignmentSubmission.assignment_id == assignment.id,
             AssignmentSubmission.student_id == current_user.id
         )
         .order_by(AssignmentSubmission.submitted_at.desc())
     )
-    submissions = submissions_result.scalars().all()
+    rows = submissions_result.all()
 
     response = []
-    for s in submissions:
-        student_result = await db.execute(select(User).where(User.id == s.student_id))
-        student = student_result.scalar_one_or_none()
+    for s, student in rows:
         response.append({
             "id": s.id,
             "assignment_id": s.assignment_id,
             "student_id": s.student_id,
-            "student_name": student.full_name if student else None,
+            "student_name": student.full_name if student else current_user.full_name,
             "submission_text": s.submission_text,
             "attachments": _parse_and_presign_attachments(s.attachments),
             "score": s.score,
@@ -356,23 +345,24 @@ async def get_all_submissions(
     current_user: User = Depends(require_lecturer)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_course_ownership(course, current_user)
 
     result = await db.execute(select(Assignment).where(Assignment.lesson_id == lesson_id))
     assignment = result.scalar_one_or_none()
     if not assignment:
         return []
 
+    # Joined with User to eliminate N+1 query problem
     submissions_result = await db.execute(
-        select(AssignmentSubmission)
+        select(AssignmentSubmission, User)
+        .outerjoin(User, User.id == AssignmentSubmission.student_id)
         .where(AssignmentSubmission.assignment_id == assignment.id)
         .order_by(AssignmentSubmission.submitted_at.desc())
     )
-    submissions = submissions_result.scalars().all()
+    rows = submissions_result.all()
 
     response = []
-    for s in submissions:
-        student_result = await db.execute(select(User).where(User.id == s.student_id))
-        student = student_result.scalar_one_or_none()
+    for s, student in rows:
         response.append({
             "id": s.id,
             "assignment_id": s.assignment_id,

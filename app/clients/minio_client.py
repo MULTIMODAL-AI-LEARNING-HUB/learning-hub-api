@@ -23,8 +23,15 @@ def get_minio_client() -> Optional[Minio]:
     global _minio_client
     if _minio_client is None:
         try:
+            endpoint = settings.MINIO_ENDPOINT
+            if endpoint.startswith("https://"):
+                endpoint = endpoint[len("https://"):]
+            elif endpoint.startswith("http://"):
+                endpoint = endpoint[len("http://"):]
+            endpoint = endpoint.rstrip("/")
+
             client = Minio(
-                endpoint=settings.MINIO_ENDPOINT,
+                endpoint=endpoint,
                 access_key=settings.MINIO_ACCESS_KEY,
                 secret_key=settings.MINIO_SECRET_KEY,
                 secure=settings.MINIO_SECURE,

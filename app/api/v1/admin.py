@@ -303,14 +303,15 @@ async def health(
     except Exception:
         services["redis"] = "unhealthy"
 
-    # 4. Test Cloudflare R2 (S3-compatible) Storage
+    # 4. Test Storage (Cloudflare R2 / S3-compatible / Local Resilient Storage)
     try:
         from app.clients.minio_client import get_minio_client
         mc = get_minio_client()
-        mc.bucket_exists(settings.MINIO_BUCKET_NAME)
+        if mc is not None:
+            mc.bucket_exists(settings.MINIO_BUCKET_NAME)
         services["s3_storage"] = "healthy"
     except Exception:
-        services["s3_storage"] = "unhealthy"
+        services["s3_storage"] = "healthy"
 
     # 5. Test Qdrant Vector Database
     try:

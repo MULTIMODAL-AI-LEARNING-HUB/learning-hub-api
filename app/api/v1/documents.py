@@ -212,3 +212,16 @@ async def delete_document(
 
     # 4. Invalidate document caches
     await RedisCache().delete_pattern(f"cache:docs:{current_user.id}:*")
+
+
+@router.get("/raw/{filename}")
+async def get_raw_storage_file(filename: str):
+    """Serve files directly from local storage fallback."""
+    from fastapi.responses import FileResponse
+    from app.clients.minio_client import LOCAL_STORAGE_DIR
+
+    file_path = LOCAL_STORAGE_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(file_path)
+

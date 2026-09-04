@@ -1,14 +1,6 @@
 """Task dispatch helpers for document processing."""
 
-from celery import Celery
-
-from app.core.config import settings
-
-celery_app = Celery(
-    "learning_hub_api",
-    broker=settings.CELERY_BROKER_URL,
-    backend=settings.REDIS_URL,
-)
+from app.core.celery import celery_app
 
 
 def dispatch_process_document(document_id: str) -> None:

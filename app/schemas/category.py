@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CategoryBase(BaseModel):
@@ -28,8 +28,7 @@ class CategoryResponse(CategoryBase):
     id: UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CategoryTreeResponse(BaseModel):
@@ -41,5 +40,4 @@ class CategoryTreeResponse(BaseModel):
     image_url: str | None = None
     children: list["CategoryTreeResponse"] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

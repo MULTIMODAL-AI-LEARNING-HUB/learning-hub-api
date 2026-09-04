@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class EnrollmentBase(BaseModel):
@@ -36,8 +36,7 @@ class EnrollmentResponse(BaseModel):
     enrolled_at: datetime
     completed_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnrollmentWithCourseResponse(EnrollmentResponse):
@@ -48,8 +47,7 @@ class EnrollmentWithCourseResponse(EnrollmentResponse):
     student_email: str | None = None
     student_avatar_url: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnrollmentListResponse(BaseModel):

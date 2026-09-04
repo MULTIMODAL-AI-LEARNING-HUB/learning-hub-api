@@ -21,9 +21,16 @@ from app.core.config import settings
 from app.core.limiter import limiter, rate_limit_exceeded_handler
 
 
+from app.core.logging import configure_logging, get_logger
+
+logger = get_logger("app.main")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle events to manage shared resource connection pools"""
+    configure_logging(settings.DEBUG)
+    logger.info("Initializing connection pools...")
     # 1. Initialize Redis Pool
     get_redis_client()
     # 2. Initialize AI Service Async Client Pool
@@ -31,6 +38,7 @@ async def lifespan(app: FastAPI):
     
     yield
     
+    logger.info("Closing connection pools...")
     # 3. Clean up Redis Pool
     await close_redis()
     # 4. Clean up HTTP Client Pool
@@ -78,6 +86,34 @@ app.include_router(api_router, prefix="/api/v1")
 async def health():
     """Simple ping health endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/health/ready")
+async def readiness():
+    """Enterprise readiness probe verifying critical infrastructure dependencies."""
+    checks = {"database": "unknown", "redis": "unknown"}
+
+    # Check Redis
+    try:
+        redis = get_redis_client()
+        if await redis.ping():
+            checks["redis"] = "healthy"
+    except Exception as e:
+        checks["redis"] = f"unhealthy: {str(e)}"
+
+    # Check Database
+    try:
+        from sqlalchemy import text
+        from app.core.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = "healthy"
+    except Exception as e:
+        checks["database"] = f"unhealthy: {str(e)}"
+
+    is_ready = all(v == "healthy" for v in checks.values())
+    status_code = status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE
+    return JSONResponse(status_code=status_code, content={"status": "ready" if is_ready else "degraded", "dependencies": checks})
 
 
 # Global Exception Handlers

@@ -3,7 +3,7 @@
 from celery.result import AsyncResult
 from fastapi import HTTPException, status
 
-from app.tasks.document_tasks import celery_app
+from app.core.celery import celery_app
 
 
 def dispatch_generate_quiz(document_id: str, quiz_type: str, question_count: int) -> str:

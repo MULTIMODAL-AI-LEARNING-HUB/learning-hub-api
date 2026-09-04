@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class AdminUserCreate(BaseModel):
@@ -25,8 +25,7 @@ class AdminUserResponse(BaseModel):
     is_active: bool
     created_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminUserListResponse(BaseModel):
@@ -53,8 +52,7 @@ class AdminCourseResponse(BaseModel):
     category_name: str | None = None
     enrollment_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminCourseListResponse(BaseModel):

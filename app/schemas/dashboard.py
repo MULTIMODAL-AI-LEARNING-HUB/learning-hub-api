@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class DashboardCourseProgress(BaseModel):
@@ -15,8 +15,7 @@ class DashboardCourseProgress(BaseModel):
     total_materials: int
     completed_materials: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DashboardStats(BaseModel):
@@ -33,8 +32,7 @@ class DashboardActivity(BaseModel):
     score: int | None = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DashboardResponse(BaseModel):

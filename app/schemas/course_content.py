@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 # ============ SECTION SCHEMAS ============
 
@@ -26,8 +26,7 @@ class SectionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SectionWithLessons(BaseModel):
@@ -40,8 +39,7 @@ class SectionWithLessons(BaseModel):
     updated_at: datetime
     lessons: List["LessonResponse"] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============ LESSON SCHEMAS ============
@@ -86,8 +84,7 @@ class LessonResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LessonWithContent(LessonResponse):
@@ -107,8 +104,7 @@ class AttachmentResponse(BaseModel):
     file_size: Optional[int]
     uploaded_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AttachmentCreate(BaseModel):
@@ -150,8 +146,7 @@ class QuizResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizWithQuestions(QuizResponse):
@@ -179,8 +174,7 @@ class AnswerResponse(BaseModel):
     order_index: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============ QUESTION SCHEMAS ============
@@ -211,8 +205,7 @@ class QuestionResponse(BaseModel):
     order_index: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuestionWithAnswers(QuestionResponse):
@@ -228,8 +221,7 @@ class AnswerStudentResponse(BaseModel):
     order_index: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuestionStudentResponse(BaseModel):
@@ -242,8 +234,7 @@ class QuestionStudentResponse(BaseModel):
     created_at: datetime
     answers: List[AnswerStudentResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizStudentResponse(QuizResponse):
@@ -271,8 +262,7 @@ class QuizAttemptResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizAttemptResult(QuizAttemptResponse):
@@ -316,8 +306,7 @@ class AssignmentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssignmentWithSubmissions(AssignmentResponse):
@@ -349,8 +338,7 @@ class SubmissionResponse(BaseModel):
     graded_at: Optional[datetime]
     is_late: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============ DISCUSSION SCHEMAS ============
@@ -380,8 +368,7 @@ class DiscussionResponse(BaseModel):
     updated_at: datetime
     replies: List["DiscussionResponse"] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============ REVIEW SCHEMAS ============
@@ -411,8 +398,7 @@ class ReviewResponse(BaseModel):
     student_name: Optional[str] = None
     course_title: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============ COURSE UPDATE SCHEMAS ============

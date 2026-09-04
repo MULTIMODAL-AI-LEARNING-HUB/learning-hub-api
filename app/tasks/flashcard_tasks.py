@@ -1,6 +1,6 @@
 """Task helpers for flashcard generation."""
 
-from app.tasks.document_tasks import celery_app
+from app.core.celery import celery_app
 
 
 def dispatch_generate_flashcards(flashcard_id: str, document_id: str, set_name: str, count: int) -> str:

@@ -18,6 +18,7 @@ engine = create_async_engine(
     connect_args={"command_timeout": 60, "ssl": settings.DB_SSL_MODE},
 )
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_session_factory
 
 
 class Base(DeclarativeBase):

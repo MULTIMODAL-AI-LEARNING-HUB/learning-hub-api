@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 from app.schemas.course_material import CourseMaterialResponse
 
@@ -54,8 +54,7 @@ class LecturerResponse(BaseModel):
     full_name: str | None = None
     avatar_url: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CategoryBasicResponse(BaseModel):
@@ -63,8 +62,7 @@ class CategoryBasicResponse(BaseModel):
     name: str
     slug: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CourseResponse(BaseModel):
@@ -91,8 +89,7 @@ class CourseResponse(BaseModel):
     lecturer: LecturerResponse | None = None
     category: CategoryBasicResponse | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CourseListResponse(BaseModel):
@@ -107,5 +104,4 @@ class CourseDetailResponse(CourseResponse):
     enrolled_count: int = 0
     materials: list[CourseMaterialResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

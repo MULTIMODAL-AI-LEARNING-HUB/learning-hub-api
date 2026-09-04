@@ -9,7 +9,6 @@ from sqlalchemy.orm import selectinload
 
 from app.clients.minio_client import MinioClient
 from app.core.cache import RedisCache
-from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.course_auth import (
@@ -17,7 +16,7 @@ from app.dependencies.course_auth import (
     verify_course_ownership,
     verify_lesson_access,
 )
-from app.models import Attachment, Course, Lesson, Section
+from app.models import Attachment, Lesson
 from app.models.user import User
 from app.schemas.course_content import (
     AttachmentCreate,

@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.course_auth import get_course_or_404, verify_course_ownership
-from app.models import Course, Section
+from app.models import Section
 from app.models.user import User
 from app.schemas.course_content import (
     ReorderSections,

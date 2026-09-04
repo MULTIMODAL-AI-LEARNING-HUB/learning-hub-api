@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.cache import RedisCache
-from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.dependencies.course_auth import (
@@ -15,7 +14,7 @@ from app.dependencies.course_auth import (
     verify_course_access,
     verify_course_ownership,
 )
-from app.models import Announcement, Course, User
+from app.models import Announcement, User
 from app.schemas.announcement import (
     AnnouncementCreate,
     AnnouncementResponse,

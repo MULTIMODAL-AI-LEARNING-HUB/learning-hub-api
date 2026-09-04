@@ -21,7 +21,6 @@ from app.schemas.auth import RegisterRequest
 from app.schemas.course_content import (
     AnswerStudentResponse,
     QuestionStudentResponse,
-    QuizStudentResponse,
 )
 from app.services.auth_service import AuthService
 from app.services.payment_gateway_service import MoMoService, VNPayService

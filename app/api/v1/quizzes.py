@@ -20,13 +20,11 @@ from app.dependencies.course_auth import (
 )
 from app.models import (
     Answer,
-    Course,
     Enrollment,
     Lesson,
     Question,
     Quiz,
     QuizAttempt,
-    Section,
 )
 from app.models.user import User
 from app.schemas.course_content import (

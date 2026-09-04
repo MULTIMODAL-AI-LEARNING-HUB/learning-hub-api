@@ -13,7 +13,7 @@ from app.dependencies.auth import (
     require_lecturer,
 )
 from app.dependencies.course_auth import get_course_or_404, verify_course_ownership
-from app.models import Course, Enrollment, Review
+from app.models import Enrollment, Review
 from app.models.user import User
 from app.schemas.course_content import (
     LecturerReply,

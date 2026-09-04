@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.clients.minio_client import MinioClient
 from app.core.database import get_db
@@ -19,15 +18,11 @@ from app.dependencies.auth import (
 from app.dependencies.course_auth import (
     get_lesson_with_course,
     verify_course_ownership,
-    verify_lesson_access,
 )
 from app.models import (
     Assignment,
     AssignmentSubmission,
-    Course,
     Enrollment,
-    Lesson,
-    Section,
 )
 from app.models.user import User
 from app.schemas.course_content import (

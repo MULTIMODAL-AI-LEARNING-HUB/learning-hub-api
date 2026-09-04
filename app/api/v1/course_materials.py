@@ -17,13 +17,11 @@ from app.dependencies.db import get_db
 from app.models.course_material import CourseMaterial
 from app.models.user import User
 from app.repositories.course_material_repo import CourseMaterialRepository
-from app.repositories.course_repo import CourseRepository
 from app.schemas import (
     CourseMaterialListResponse,
     CourseMaterialResponse,
     CourseMaterialUpdate,
 )
-from app.services.course_service import CourseService
 from app.utils.upload import read_upload_file_safely, sanitize_filename
 
 router = APIRouter(prefix="/{course_id}/materials", tags=["course-materials"])

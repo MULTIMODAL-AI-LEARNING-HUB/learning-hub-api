@@ -15,10 +15,15 @@ def get_redis_client() -> aioredis.Redis:
     """Get or initialize the shared async Redis client."""
     global _redis_client
     if _redis_client is None:
+        kwargs: dict[str, Any] = {
+            "decode_responses": True,
+            "max_connections": 50,
+        }
+        if settings.REDIS_URL.startswith("rediss://"):
+            kwargs["ssl_cert_reqs"] = "none"
         _redis_client = aioredis.from_url(
             settings.REDIS_URL,
-            decode_responses=True,
-            max_connections=50
+            **kwargs,
         )
     return _redis_client
 

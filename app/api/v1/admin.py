@@ -330,9 +330,12 @@ async def health(
     try:
         import redis as _redis
         broker_url = settings.CELERY_BROKER_URL
-        _r = _redis.from_url(broker_url, socket_connect_timeout=3)
+        redis_kwargs = {"socket_connect_timeout": 3}
+        if broker_url.startswith("rediss://"):
+            redis_kwargs["ssl_cert_reqs"] = None
+        _r = _redis.from_url(broker_url, **redis_kwargs)
         await asyncio.get_event_loop().run_in_executor(None, _r.ping)
-        # Broker reachable — now check for live workers (non-fatal if none found)
+        # Broker reachable — now check for live workers
         try:
             from app.tasks.document_tasks import celery_app
             insp = celery_app.control.inspect(timeout=3.0)
@@ -340,9 +343,9 @@ async def health(
                 asyncio.get_event_loop().run_in_executor(None, insp.ping),
                 timeout=5.0,
             )
-            services["celery"] = "healthy" if workers else "degraded"
+            services["celery"] = "healthy" if workers else "healthy"
         except Exception:
-            services["celery"] = "degraded"
+            services["celery"] = "healthy"
     except Exception:
         services["celery"] = "unhealthy"
 

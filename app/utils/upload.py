@@ -13,8 +13,9 @@ def sanitize_filename(raw_filename: str | None) -> str:
     if not raw_filename:
         return "uploaded_file"
 
-    # Remove path directory separators
-    filename = os.path.basename(raw_filename)
+    # Remove path directory separators (normalize backslashes for cross-platform POSIX/Windows safety)
+    normalized = raw_filename.replace("\\", "/")
+    filename = os.path.basename(normalized)
     # Remove null bytes
     filename = filename.replace("\0", "")
     # Remove any leading/trailing spaces or dots

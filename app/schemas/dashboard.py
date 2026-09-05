@@ -23,6 +23,8 @@ class DashboardStats(BaseModel):
     total_materials: int
     total_completed: int
     avg_progress: float
+    streak_days: int = 1
+    daily_goal_percent: int = 50
 
 
 class DashboardActivity(BaseModel):

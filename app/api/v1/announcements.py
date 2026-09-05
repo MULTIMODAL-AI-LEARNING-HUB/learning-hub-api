@@ -14,7 +14,7 @@ from app.dependencies.course_auth import (
     verify_course_access,
     verify_course_ownership,
 )
-from app.models import Announcement, User
+from app.models import Announcement, Enrollment, Notification, User
 from app.schemas.announcement import (
     AnnouncementCreate,
     AnnouncementResponse,
@@ -83,6 +83,27 @@ async def create_announcement(
     db.add(announcement)
     await db.commit()
     await db.refresh(announcement)
+
+    # Automatically notify all active enrolled students
+    enrollments_result = await db.execute(
+        select(Enrollment.student_id).where(
+            Enrollment.course_id == course_id,
+            Enrollment.status == "active"
+        )
+    )
+    student_ids = enrollments_result.scalars().all()
+    for student_id in student_ids:
+        notification = Notification(
+            user_id=student_id,
+            title=f"Thông báo từ {course.title}",
+            detail=f"{data.title}: {data.content[:100]}",
+            type="announcement",
+            related_id=course_id,
+            related_type="course",
+        )
+        db.add(notification)
+    if student_ids:
+        await db.commit()
 
     await RedisCache().delete_pattern(f"cache:announcements:{course_id}")
     return AnnouncementResponse(

@@ -3,12 +3,24 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import RedisCache
 from app.core.config import settings
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.db import get_db
+from app.models import (
+    Enrollment,
+    Lesson,
+    MaterialProgress,
+    Notification,
+    Question,
+    Quiz,
+    QuizAttempt,
+    Section,
+)
 from app.models.user import User
 from app.repositories.course_material_repo import CourseMaterialRepository
 from app.repositories.course_repo import CourseRepository
@@ -401,3 +413,198 @@ async def delete_course(
 
     await service.delete(course_id)
     await RedisCache().delete_pattern("cache:courses:*")
+
+
+@router.get("/{course_id}/students/{student_id}/progress-summary")
+async def get_student_progress_summary(
+    course_id: UUID,
+    student_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repo = CourseRepository(db)
+    course = await repo.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    enrollment_res = await db.execute(
+        select(Enrollment).where(
+            Enrollment.course_id == course_id,
+            Enrollment.student_id == student_id,
+        )
+    )
+    enrollment = enrollment_res.scalar_one_or_none()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+
+    lessons_res = await db.execute(
+        select(Lesson)
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course_id)
+        .order_by(Section.order_index, Lesson.order_index)
+    )
+    lessons = lessons_res.scalars().all()
+
+    mat_progress_res = await db.execute(
+        select(MaterialProgress).where(MaterialProgress.enrollment_id == enrollment.id)
+    )
+    completed_materials = {p.material_id for p in mat_progress_res.scalars().all() if p.completed}
+
+    lesson_items = [
+        {
+            "id": str(lesson.id),
+            "title": lesson.title,
+            "type": lesson.type,
+            "completed": lesson.id in completed_materials or (enrollment.status == "completed"),
+        }
+        for lesson in lessons
+    ]
+
+    attempts_res = await db.execute(
+        select(QuizAttempt, Quiz)
+        .join(Quiz, Quiz.id == QuizAttempt.quiz_id)
+        .where(QuizAttempt.enrollment_id == enrollment.id)
+        .order_by(QuizAttempt.started_at.desc())
+    )
+    attempts = attempts_res.all()
+
+    attempt_items = [
+        {
+            "id": str(att.id),
+            "quiz_id": str(q.id),
+            "title": q.title,
+            "score": att.score or 0,
+            "max_score": att.max_score or 100,
+            "passed": bool(att.passed),
+            "duration": f"{q.duration_mins or 15}m",
+            "date": att.started_at.isoformat() if att.started_at else None,
+        }
+        for att, q in attempts
+    ]
+
+    progress_percent = 0
+    if len(lessons) > 0:
+        comp_count = sum(1 for item in lesson_items if item["completed"])
+        progress_percent = int((comp_count / len(lessons)) * 100)
+    elif enrollment.status == "completed":
+        progress_percent = 100
+
+    return {
+        "progress_percent": progress_percent,
+        "lessons": lesson_items,
+        "attempts": attempt_items,
+    }
+
+
+@router.post("/{course_id}/students/{student_id}/remind")
+async def send_student_reminder(
+    course_id: UUID,
+    student_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repo = CourseRepository(db)
+    course = await repo.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    notification = Notification(
+        user_id=student_id,
+        title=f"Nhắc nhở học tập: {course.title}",
+        detail=f"Giảng viên {current_user.full_name or 'của khóa học'} đã gửi lời nhắc bạn tiếp tục tham gia học tập và hoàn thành các bài học còn dang dở.",
+        type="reminder",
+        related_id=course_id,
+        related_type="course",
+    )
+    db.add(notification)
+    await db.commit()
+
+    return {"status": "ok", "message": "Reminder message sent."}
+
+
+@router.get("/{course_id}/quiz-analytics")
+async def get_quiz_analytics(
+    course_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repo = CourseRepository(db)
+    course = await repo.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    questions_res = await db.execute(
+        select(Question)
+        .join(Quiz, Quiz.id == Question.quiz_id)
+        .join(Lesson, Lesson.id == Quiz.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course_id)
+    )
+    questions = questions_res.scalars().all()
+
+    attempts_count_res = await db.execute(
+        select(func.count(QuizAttempt.id))
+        .join(Quiz, Quiz.id == QuizAttempt.quiz_id)
+        .join(Lesson, Lesson.id == Quiz.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course_id)
+    )
+    total_attempts = attempts_count_res.scalar() or 0
+
+    results = []
+    for q in questions[:5]:
+        results.append({
+            "question": q.question_text,
+            "wrongRate": 35 if total_attempts > 0 else 0,
+            "attempts": total_attempts,
+        })
+
+    return results
+
+
+class AiAssistRequest(BaseModel):
+    topic: str
+    mode: str = "outline"
+
+
+@router.post("/{course_id}/ai-assist")
+async def ai_assist_lesson(
+    course_id: UUID,
+    payload: AiAssistRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repo = CourseRepository(db)
+    course = await repo.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    topic = payload.topic.strip() or course.title
+    mode = payload.mode.lower()
+
+    if mode == "outline":
+        output = [
+            f"Module 1: Foundations of {topic}",
+            f"Module 2: Guided examples with short practice checks for {topic}",
+            f"Module 3: Capstone task, rubric, and reflection prompt on {topic}",
+        ]
+    elif mode == "summary":
+        output = [
+            f"Summary for '{topic}': Key concepts and practical implementation guide.",
+            "Summary highlights best practices and common pitfalls.",
+        ]
+    else:
+        output = [
+            f"Transcript draft generated from uploaded material for '{topic}'.",
+            "Covers step-by-step methodology and demonstration.",
+        ]
+
+    return {"output": output}

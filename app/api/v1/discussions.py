@@ -231,3 +231,96 @@ async def upvote_discussion(
         "updated_at": discussion.updated_at,
         "replies": []
     }
+
+
+@router.post("/posts/{post_id}/mark-answer", response_model=DiscussionResponse)
+async def toggle_mark_answer(
+    lesson_id: UUID,
+    post_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    lesson, course = await get_lesson_with_course(db, lesson_id)
+    if course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only course instructor or admin can mark official answer")
+
+    result = await db.execute(
+        select(Discussion)
+        .where(Discussion.id == post_id)
+        .options(selectinload(Discussion.user))
+    )
+    discussion = result.scalar_one_or_none()
+    if not discussion:
+        raise HTTPException(status_code=404, detail="Discussion post not found")
+
+    discussion.is_answer = not discussion.is_answer
+    await db.commit()
+    await db.refresh(discussion)
+
+    return {
+        "id": discussion.id,
+        "lesson_id": discussion.lesson_id,
+        "user_id": discussion.user_id,
+        "user_name": discussion.user.full_name if discussion.user else None,
+        "user_avatar": discussion.user.avatar_url if discussion.user else None,
+        "parent_id": discussion.parent_id,
+        "content": discussion.content,
+        "is_pinned": discussion.is_pinned,
+        "is_answer": discussion.is_answer,
+        "upvotes": discussion.upvotes,
+        "reply_count": 0,
+        "created_at": discussion.created_at,
+        "updated_at": discussion.updated_at,
+        "replies": []
+    }
+
+
+course_discussions_router = APIRouter(prefix="/courses/{course_id}/discussions", tags=["Discussions"])
+
+
+@course_discussions_router.get("")
+async def list_course_discussions(
+    course_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.dependencies.course_auth import get_course_or_404, verify_course_access
+    from app.models import Section, Lesson
+
+    course = await get_course_or_404(db, course_id)
+    has_access = await verify_course_access(course, current_user, db)
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Active enrollment required")
+
+    result = await db.execute(
+        select(Discussion)
+        .join(Lesson, Lesson.id == Discussion.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course_id, Discussion.parent_id.is_(None))
+        .options(
+            selectinload(Discussion.user),
+            selectinload(Discussion.lesson),
+            selectinload(Discussion.replies)
+        )
+        .order_by(Discussion.is_pinned.desc(), Discussion.created_at.desc())
+    )
+    discussions = result.scalars().all()
+
+    return [
+        {
+            "id": d.id,
+            "lesson_id": d.lesson_id,
+            "lesson_title": d.lesson.title if d.lesson else None,
+            "user_id": d.user_id,
+            "user_name": d.user.full_name if d.user else "Anonymous",
+            "user_avatar": d.user.avatar_url if d.user else None,
+            "content": d.content,
+            "is_pinned": d.is_pinned,
+            "is_answer": d.is_answer,
+            "upvotes": d.upvotes,
+            "reply_count": len(d.replies) if d.replies else 0,
+            "created_at": d.created_at,
+            "updated_at": d.updated_at,
+        }
+        for d in discussions
+    ]

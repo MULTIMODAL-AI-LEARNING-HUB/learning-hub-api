@@ -133,7 +133,7 @@ async def create_review(
     }
 
 
-@router.get("/my-review", response_model=ReviewResponse)
+@router.get("/my-review", response_model=ReviewResponse | None)
 async def get_my_review(
     course_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -149,12 +149,12 @@ async def get_my_review(
     )
     enrollment = enrollment_result.scalar_one_or_none()
     if not enrollment:
-        raise HTTPException(status_code=404, detail="Not enrolled")
+        return None
 
     result = await db.execute(select(Review).where(Review.enrollment_id == enrollment.id))
     review = result.scalar_one_or_none()
     if not review:
-        raise HTTPException(status_code=404, detail="Review not found")
+        return None
 
     return {
         "id": review.id,

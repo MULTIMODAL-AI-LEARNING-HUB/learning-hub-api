@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.v1 import api_router
 from app.clients.ai_client import close_ai_client, get_ai_client
@@ -64,6 +65,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Internal-API-Key"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 
 @app.middleware("http")

@@ -366,7 +366,7 @@ async def health(
 
 async def _sync_active_keys_to_ai_service(db: AsyncSession):
     try:
-        result = await db.execute(select(AiApiKey).where(AiApiKey.is_active == True))
+        result = await db.execute(select(AiApiKey).where(AiApiKey.is_active.is_(True)))
         active_keys = result.scalars().all()
         keys_payload = [
             {

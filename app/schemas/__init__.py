@@ -13,6 +13,7 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     GoogleLoginRequest,
     LoginRequest,
+    LogoutRequest,
     MessageResponse,
     RefreshRequest,
     RegisterRequest,

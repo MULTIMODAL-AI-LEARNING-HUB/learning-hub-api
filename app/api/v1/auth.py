@@ -20,6 +20,7 @@ from app.schemas import (
     ForgotPasswordRequest,
     GoogleLoginRequest,
     LoginRequest,
+    LogoutRequest,
     MessageResponse,
     RefreshRequest,
     RegisterRequest,
@@ -57,7 +58,7 @@ def _build_user_response(user: User) -> AuthUserResponse:
 
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
-@limiter.limit(settings.RATE_LIMIT_AUTH)
+@limiter.limit(settings.RATE_LIMIT_REGISTER)
 async def register(
     request: Request,
     payload: RegisterRequest,
@@ -75,7 +76,7 @@ async def register(
 
 
 @router.post("/login", response_model=AuthResponse)
-@limiter.limit(settings.RATE_LIMIT_AUTH)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(
     request: Request,
     payload: LoginRequest,
@@ -90,6 +91,21 @@ async def login(
         user=_build_user_response(user),
         token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
     )
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout(
+    request: Request,
+    payload: LogoutRequest = LogoutRequest(),
+) -> MessageResponse:
+    """Invalidate refresh token and log user out."""
+    if payload and payload.refresh_token:
+        token_payload = decode_token(payload.refresh_token)
+        if token_payload and token_payload.get("type") == "refresh":
+            jti = token_payload.get("jti")
+            if jti:
+                await AuthService.invalidate_refresh_token(jti)
+    return MessageResponse(message="Successfully logged out")
 
 
 @router.post("/google", response_model=AuthResponse)

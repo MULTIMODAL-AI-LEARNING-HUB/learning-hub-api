@@ -24,3 +24,29 @@ async def test_login_missing_credentials(client):
     assert response.status_code == 422
     data = response.json()
     assert data["error"] == "validation_error"
+
+
+@pytest.mark.asyncio
+async def test_register_short_password(client):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "shortpwd@test.com",
+            "password": "short",
+            "full_name": "Short Pwd"
+        }
+    )
+    assert response.status_code == 422
+    data = response.json()
+    assert data["error"] == "validation_error"
+
+
+@pytest.mark.asyncio
+async def test_logout_endpoint(client):
+    response = await client.post(
+        "/api/v1/auth/logout",
+        json={}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Successfully logged out"

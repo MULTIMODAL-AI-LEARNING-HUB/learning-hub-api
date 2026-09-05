@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=12)
+    password: str = Field(min_length=8)
     full_name: str | None = Field(default=None, max_length=255)
     role: str = Field(default="student", pattern="^(student|lecturer)$")
 
@@ -26,6 +26,10 @@ class FacebookLoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -65,7 +69,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    password: str = Field(min_length=12)
+    password: str = Field(min_length=8)
 
 
 class MessageResponse(BaseModel):

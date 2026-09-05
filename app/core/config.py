@@ -41,7 +41,9 @@ class Settings(BaseSettings):
     REDIS_CACHE_TTL_ENROLLMENTS: int = 60
     REDIS_CACHE_TTL_ANNOUNCEMENTS: int = 120
     REDIS_CACHE_TTL_LESSONS: int = 120
-    RATE_LIMIT_AUTH: str = "500/minute"
+    RATE_LIMIT_AUTH: str = "60/minute"
+    RATE_LIMIT_LOGIN: str = "10/minute"
+    RATE_LIMIT_REGISTER: str = "10/minute"
     RATE_LIMIT_CHAT: str = "30/minute"
     RATE_LIMIT_UPLOAD: str = "5/minute"
     RATE_LIMIT_ADMIN: str = "60/minute"

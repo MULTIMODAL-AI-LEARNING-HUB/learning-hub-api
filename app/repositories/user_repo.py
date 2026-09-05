@@ -125,19 +125,23 @@ class UserRepository(BaseRepository):
         return list(result.scalars().all())
 
     async def set_reset_token(self, user_id: UUID, token: str, expiry: datetime) -> None:
+        import hashlib
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         result = await self.db.execute(
             select(User).where(User.id == user_id)
         )
         user = result.scalar_one_or_none()
         if user:
-            user.reset_token = token
+            user.reset_token = token_hash
             user.reset_token_expiry = expiry
             await self.db.commit()
 
     async def get_user_by_reset_token(self, token: str) -> User | None:
+        import hashlib
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
         result = await self.db.execute(
             select(User)
-            .where(User.reset_token == token, User.reset_token_expiry > datetime.now(timezone.utc))
+            .where(User.reset_token == token_hash, User.reset_token_expiry > datetime.now(timezone.utc))
             .options(selectinload(User.quota))
         )
         return result.scalar_one_or_none()

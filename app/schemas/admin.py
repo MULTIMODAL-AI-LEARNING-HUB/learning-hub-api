@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 class AdminUserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=12)
+    password: str = Field(min_length=8)
     full_name: str | None = Field(default=None, max_length=255)
     role: str = Field(default="student", pattern="^(admin|lecturer|student)$")
 

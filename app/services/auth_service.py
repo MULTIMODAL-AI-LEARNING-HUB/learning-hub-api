@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from app.core.cache import get_redis_client
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -262,7 +263,8 @@ class AuthService:
         """Blacklist a refresh token by its jti claim."""
         try:
             redis = get_redis_client()
-            await redis.set(f"revoked_token:{jti}", "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+            ttl_seconds = settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+            await redis.set(f"revoked_token:{jti}", "1", ex=ttl_seconds)
         except Exception as e:
             import logging
             logging.error(f"Redis error invalidating refresh token {jti}: {e}")

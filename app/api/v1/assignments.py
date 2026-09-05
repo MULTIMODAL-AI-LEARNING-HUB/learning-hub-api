@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -74,7 +74,7 @@ def _parse_and_presign_attachments(attachments_str: str | None) -> list:
 
 # ============ ASSIGNMENT ROUTES (LECTURER) ============
 
-@router.get("", response_model=AssignmentResponse)
+@router.get("", response_model=Optional[AssignmentResponse])
 async def get_assignment(
     lesson_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -82,10 +82,7 @@ async def get_assignment(
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
     result = await db.execute(select(Assignment).where(Assignment.lesson_id == lesson_id))
-    assignment = result.scalar_one_or_none()
-    if not assignment:
-        raise HTTPException(status_code=404, detail="Assignment not found")
-    return assignment
+    return result.scalar_one_or_none()
 
 
 @router.post("", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)

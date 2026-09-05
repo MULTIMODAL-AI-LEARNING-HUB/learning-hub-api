@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -140,7 +141,7 @@ async def validation_exception_handler(request, exc: RequestValidationError):
         content={
             "error": "validation_error",
             "message": "Invalid request payload",
-            "details": exc.errors()
+            "details": jsonable_encoder(exc.errors())
         }
     )
 

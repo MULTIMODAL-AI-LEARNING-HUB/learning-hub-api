@@ -22,7 +22,5 @@ class AiApiKey(Base):
 
     @property
     def masked_key(self) -> str:
-        k = self.api_key.strip()
-        if len(k) <= 10:
-            return '***'
-        return f'{k[:6]}...{k[-4:]}'
+        return '••••••••••••••••'
+

@@ -70,6 +70,21 @@ DDL_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS ix_social_chat_messages_room_id ON social_chat_messages (room_id)",
     "CREATE INDEX IF NOT EXISTS ix_social_chat_messages_sender_id ON social_chat_messages (sender_id)",
     "CREATE INDEX IF NOT EXISTS ix_social_chat_messages_created_at ON social_chat_messages (created_at)",
+    """
+    CREATE TABLE IF NOT EXISTS ai_api_keys (
+        id UUID PRIMARY KEY,
+        provider VARCHAR(50) NOT NULL DEFAULT 'gemini',
+        key_name VARCHAR(100) NOT NULL,
+        api_key TEXT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        usage_count INTEGER NOT NULL DEFAULT 0,
+        last_used_at TIMESTAMP WITHOUT TIME ZONE NULL,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_ai_api_keys_provider ON ai_api_keys (provider)",
+    "CREATE INDEX IF NOT EXISTS ix_ai_api_keys_is_active ON ai_api_keys (is_active)",
     "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)",
     "DELETE FROM alembic_version",
     f"INSERT INTO alembic_version (version_num) VALUES ('{HEAD_REVISION}')",

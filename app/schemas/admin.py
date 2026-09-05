@@ -60,3 +60,27 @@ class AdminCourseListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AiApiKeyCreate(BaseModel):
+    api_key: str = Field(..., min_length=10)
+    key_name: str = Field(..., min_length=1, max_length=100)
+    provider: str = Field(default="gemini", max_length=50)
+
+
+class AiApiKeyResponse(BaseModel):
+    id: UUID
+    provider: str
+    key_name: str
+    masked_key: str
+    is_active: bool
+    usage_count: int
+    last_used_at: datetime | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AiApiKeyListResponse(BaseModel):
+    items: list[AiApiKeyResponse]
+    total: int

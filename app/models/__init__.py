@@ -1,3 +1,4 @@
+from app.models.ai_key import AiApiKey
 from app.models.announcement import Announcement
 from app.models.category import Category
 from app.models.chat import ChatMessage, ChatSession
@@ -62,4 +63,5 @@ __all__ = [
     "SocialChatRoom",
     "SocialChatMember",
     "SocialChatMessage",
+    "AiApiKey",
 ]

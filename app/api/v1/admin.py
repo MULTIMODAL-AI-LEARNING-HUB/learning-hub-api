@@ -7,13 +7,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clients.ai_client import get_ai_client
+from app.clients.ai_client import AiClient, get_ai_client
 from app.core.cache import RedisCache, get_redis_client
 from app.core.config import settings
 from app.core.limiter import limiter
+from app.core.logging import get_logger
 from app.core.security import hash_password
 from app.dependencies.auth import require_admin
 from app.dependencies.db import get_db
+from app.models.ai_key import AiApiKey
 from app.models.document import Document
 from app.models.enrollment import Enrollment
 from app.models.user import User
@@ -25,8 +27,13 @@ from app.schemas.admin import (
     AdminUserCreate,
     AdminUserResponse,
     AdminUserUpdate,
+    AiApiKeyCreate,
+    AiApiKeyListResponse,
+    AiApiKeyResponse,
 )
 from app.utils.pagination import build_pagination
+
+logger = get_logger("app.api.admin")
 
 router = APIRouter()
 
@@ -353,3 +360,139 @@ async def health(
     overall = "healthy" if all(v == "healthy" for v in services.values()) else "degraded"
 
     return {"status": overall, "services": services}
+
+
+# ─── AI API Keys Management (Key Rotation) ─────────────────────
+
+async def _sync_active_keys_to_ai_service(db: AsyncSession):
+    try:
+        result = await db.execute(select(AiApiKey).where(AiApiKey.is_active == True))
+        active_keys = result.scalars().all()
+        keys_payload = [
+            {
+                "id": str(k.id),
+                "provider": k.provider,
+                "key_name": k.key_name,
+                "api_key": k.api_key,
+                "is_active": k.is_active,
+                "usage_count": k.usage_count,
+            }
+            for k in active_keys
+        ]
+        await AiClient().sync_keys(keys_payload)
+    except Exception as e:
+        logger.warning(f"Failed to sync AI keys to AI service: {e}")
+
+
+@router.get("/ai-keys", response_model=AiApiKeyListResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_ai_keys(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """List all configured AI API keys with masked key values. Admin only."""
+    result = await db.execute(select(AiApiKey).order_by(AiApiKey.created_at.desc()))
+    keys = result.scalars().all()
+    items = [
+        AiApiKeyResponse(
+            id=k.id,
+            provider=k.provider,
+            key_name=k.key_name,
+            masked_key=k.masked_key,
+            is_active=k.is_active,
+            usage_count=k.usage_count,
+            last_used_at=k.last_used_at,
+            created_at=k.created_at,
+        )
+        for k in keys
+    ]
+    return AiApiKeyListResponse(items=items, total=len(items))
+
+
+@router.post("/ai-keys", response_model=AiApiKeyResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def create_ai_key(
+    request: Request,
+    payload: AiApiKeyCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Add a new AI API key for rotation. Admin only."""
+    clean_key = payload.api_key.strip()
+    existing = await db.execute(select(AiApiKey).where(AiApiKey.api_key == clean_key))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="API Key already exists")
+
+    new_key = AiApiKey(
+        provider=payload.provider.lower().strip(),
+        key_name=payload.key_name.strip(),
+        api_key=clean_key,
+        is_active=True,
+    )
+    db.add(new_key)
+    await db.commit()
+    await db.refresh(new_key)
+
+    await _sync_active_keys_to_ai_service(db)
+
+    return AiApiKeyResponse(
+        id=new_key.id,
+        provider=new_key.provider,
+        key_name=new_key.key_name,
+        masked_key=new_key.masked_key,
+        is_active=new_key.is_active,
+        usage_count=new_key.usage_count,
+        last_used_at=new_key.last_used_at,
+        created_at=new_key.created_at,
+    )
+
+
+@router.delete("/ai-keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def delete_ai_key(
+    request: Request,
+    key_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Delete an AI API key. Admin only."""
+    key = await db.get(AiApiKey, key_id)
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found")
+
+    await db.delete(key)
+    await db.commit()
+    await _sync_active_keys_to_ai_service(db)
+    return None
+
+
+@router.patch("/ai-keys/{key_id}/toggle", response_model=AiApiKeyResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def toggle_ai_key(
+    request: Request,
+    key_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Toggle an AI API key between active and inactive. Admin only."""
+    key = await db.get(AiApiKey, key_id)
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found")
+
+    key.is_active = not key.is_active
+    await db.commit()
+    await db.refresh(key)
+    await _sync_active_keys_to_ai_service(db)
+
+    return AiApiKeyResponse(
+        id=key.id,
+        provider=key.provider,
+        key_name=key.key_name,
+        masked_key=key.masked_key,
+        is_active=key.is_active,
+        usage_count=key.usage_count,
+        last_used_at=key.last_used_at,
+        created_at=key.created_at,
+    )
+

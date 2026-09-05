@@ -92,3 +92,14 @@ class AiClient:
         response = await self.client.post("/study/quiz/generate-from-lesson", json=payload, headers=headers)
         response.raise_for_status()
         return response.json()
+
+    async def sync_keys(self, keys: list[dict[str, Any]]) -> dict[str, Any]:
+        """Synchronize active AI API keys to the AI service."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
+        try:
+            response = await self.client.post("/internal/keys/sync", json={"keys": keys}, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return {"synced": False}
+

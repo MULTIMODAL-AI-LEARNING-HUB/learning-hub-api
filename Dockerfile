@@ -24,4 +24,9 @@ RUN mv /usr/local/bin/alembic /usr/local/bin/alembic-real \
     && printf '%s\n' '#!/bin/sh' 'if [ "$1" = "upgrade" ] && [ "$2" = "head" ]; then' '  exec python -m app.scripts.release_migrate' 'fi' 'exec /usr/local/bin/alembic-real "$@"' > /usr/local/bin/alembic \
     && chmod +x /usr/local/bin/alembic
 
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /app/data/storage \
+    && chown -R appuser:appuser /app
+USER appuser
+
 CMD ["sh", "-c", "python -m app.scripts.release_migrate && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT"]

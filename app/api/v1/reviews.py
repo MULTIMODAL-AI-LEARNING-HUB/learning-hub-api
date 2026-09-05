@@ -34,6 +34,8 @@ async def list_reviews(
     current_user: User = Depends(get_current_user)
 ):
     course = await get_course_or_404(db, course_id)
+    if course.status != "published" and course.lecturer_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=404, detail="Course not found")
 
     # Count total for pagination
     count_result = await db.execute(
@@ -85,7 +87,8 @@ async def create_review(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
             Enrollment.course_id == course_id,
-            Enrollment.status.in_(["active", "completed"])
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()
@@ -144,7 +147,9 @@ async def get_my_review(
     enrollment_result = await db.execute(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
-            Enrollment.course_id == course_id
+            Enrollment.course_id == course_id,
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()
@@ -181,7 +186,9 @@ async def update_my_review(
     enrollment_result = await db.execute(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
-            Enrollment.course_id == course_id
+            Enrollment.course_id == course_id,
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()

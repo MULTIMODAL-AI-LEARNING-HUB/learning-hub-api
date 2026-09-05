@@ -54,3 +54,34 @@ async def read_upload_file_safely(
         chunks.append(chunk)
 
     return b"".join(chunks)
+
+
+def validate_file_magic_bytes(content: bytes, ext: str) -> bool:
+    """Validate that file content matches expected binary header signatures for the extension."""
+    if not content:
+        return False
+
+    normalized_ext = ext.lower().strip(".")
+    if normalized_ext == "pdf":
+        return content.startswith(b"%PDF")
+    if normalized_ext == "png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if normalized_ext in ("jpg", "jpeg"):
+        return content.startswith(b"\xff\xd8\xff")
+    if normalized_ext == "mp4":
+        return len(content) >= 8 and content[4:8] == b"ftyp"
+    if normalized_ext == "webm":
+        return content.startswith(b"\x1a\x45\xdf\xa3")
+    if normalized_ext == "mp3":
+        return content.startswith(b"ID3") or (len(content) >= 2 and content[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"))
+    if normalized_ext in ("zip", "docx"):
+        return content.startswith(b"PK\x03\x04")
+    if normalized_ext == "doc":
+        return content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+    if normalized_ext == "txt":
+        try:
+            content[:1024].decode("utf-8")
+            return b"\x00" not in content[:1024]
+        except UnicodeDecodeError:
+            return False
+    return True

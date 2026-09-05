@@ -66,7 +66,14 @@ class CourseRepository(BaseRepository):
         if max_price is not None:
             query = query.where(Course.price_vnd <= max_price)
 
-        sort_column = getattr(Course, sort_by, Course.created_at)
+        sort_columns = {
+            "created_at": Course.created_at,
+            "updated_at": Course.updated_at,
+            "title": Course.title,
+            "price_vnd": Course.price_vnd,
+            "rating_avg": Course.rating_avg,
+        }
+        sort_column = sort_columns.get(sort_by, Course.created_at)
         if sort_order == "desc":
             query = query.order_by(sort_column.desc())
         else:

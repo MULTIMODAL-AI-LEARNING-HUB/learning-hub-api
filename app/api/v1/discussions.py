@@ -21,6 +21,26 @@ from app.schemas.course_content import (
 router = APIRouter(prefix="/lessons/{lesson_id}/discussions", tags=["Discussions"])
 
 
+async def _get_authorized_discussion(
+    lesson_id: UUID,
+    post_id: UUID,
+    db: AsyncSession,
+    current_user: User,
+) -> tuple[Discussion, object, object]:
+    """Load a post only in its URL lesson and enforce lesson access."""
+    lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
+    result = await db.execute(
+        select(Discussion)
+        .where(Discussion.id == post_id, Discussion.lesson_id == lesson_id)
+        .options(selectinload(Discussion.user))
+    )
+    discussion = result.scalar_one_or_none()
+    if not discussion:
+        raise HTTPException(status_code=404, detail="Discussion not found")
+    return discussion, lesson, course
+
+
 @router.get("", response_model=List[DiscussionResponse])
 async def list_discussions(
     lesson_id: UUID,
@@ -94,6 +114,17 @@ async def create_discussion(
     current_user: User = Depends(get_current_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
+
+    if discussion_data.parent_id:
+        parent = (await db.execute(
+            select(Discussion).where(
+                Discussion.id == discussion_data.parent_id,
+                Discussion.lesson_id == lesson_id,
+            )
+        )).scalar_one_or_none()
+        if not parent:
+            raise HTTPException(status_code=400, detail="Parent discussion is invalid")
 
     discussion = Discussion(
         lesson_id=lesson_id,
@@ -131,10 +162,7 @@ async def update_discussion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(Discussion).where(Discussion.id == post_id))
-    discussion = result.scalar_one_or_none()
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Discussion not found")
+    discussion, _, _ = await _get_authorized_discussion(lesson_id, post_id, db, current_user)
 
     if discussion.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -173,10 +201,7 @@ async def delete_discussion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(Discussion).where(Discussion.id == post_id))
-    discussion = result.scalar_one_or_none()
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Discussion not found")
+    discussion, _, _ = await _get_authorized_discussion(lesson_id, post_id, db, current_user)
 
     if discussion.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -201,14 +226,7 @@ async def upvote_discussion(
             detail="You have already upvoted this post"
         )
 
-    result = await db.execute(
-        select(Discussion)
-        .where(Discussion.id == post_id)
-        .options(selectinload(Discussion.user))
-    )
-    discussion = result.scalar_one_or_none()
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Discussion not found")
+    discussion, _, _ = await _get_authorized_discussion(lesson_id, post_id, db, current_user)
 
     discussion.upvotes += 1
     await db.commit()
@@ -240,18 +258,9 @@ async def toggle_mark_answer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    lesson, course = await get_lesson_with_course(db, lesson_id)
+    discussion, lesson, course = await _get_authorized_discussion(lesson_id, post_id, db, current_user)
     if course.lecturer_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only course instructor or admin can mark official answer")
-
-    result = await db.execute(
-        select(Discussion)
-        .where(Discussion.id == post_id)
-        .options(selectinload(Discussion.user))
-    )
-    discussion = result.scalar_one_or_none()
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Discussion post not found")
 
     discussion.is_answer = not discussion.is_answer
     await db.commit()

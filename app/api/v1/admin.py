@@ -86,6 +86,23 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    if user.role == "admin" and user.is_active:
+        demoting = payload.role is not None and payload.role != "admin"
+        deactivating = payload.is_active is False
+        if demoting or deactivating:
+            from sqlalchemy import and_, func, select
+            count_result = await db.execute(
+                select(func.count(User.id)).where(
+                    and_(User.role == "admin", User.is_active.is_(True))
+                )
+            )
+            active_admin_count = count_result.scalar() or 0
+            if active_admin_count <= 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot demote or deactivate the last active administrator"
+                )
+
     if payload.role is not None:
         user.role = payload.role
     if payload.is_active is not None:
@@ -120,6 +137,20 @@ async def delete_user(
     user = await repo.get_by_id(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.role == "admin" and user.is_active:
+        from sqlalchemy import and_, func, select
+        count_result = await db.execute(
+            select(func.count(User.id)).where(
+                and_(User.role == "admin", User.is_active.is_(True))
+            )
+        )
+        active_admin_count = count_result.scalar() or 0
+        if active_admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the last active administrator"
+            )
 
     await repo.delete(user_id)
 
@@ -340,7 +371,7 @@ async def health(
         broker_url = settings.CELERY_BROKER_URL
         redis_kwargs = {"socket_connect_timeout": 3}
         if broker_url.startswith("rediss://"):
-            redis_kwargs["ssl_cert_reqs"] = None
+            redis_kwargs["ssl_cert_reqs"] = "required"
         _r = _redis.from_url(broker_url, **redis_kwargs)
         await asyncio.get_event_loop().run_in_executor(None, _r.ping)
         # Broker reachable — now check for live workers
@@ -366,19 +397,28 @@ async def health(
 
 async def _sync_active_keys_to_ai_service(db: AsyncSession):
     try:
+        from app.core.secret_store import decrypt_secret, encrypt_secret
         result = await db.execute(select(AiApiKey).where(AiApiKey.is_active.is_(True)))
         active_keys = result.scalars().all()
+        changed = False
         keys_payload = [
             {
                 "id": str(k.id),
                 "provider": k.provider,
                 "key_name": k.key_name,
-                "api_key": k.api_key,
+                "api_key": decrypt_secret(k.api_key),
                 "is_active": k.is_active,
                 "usage_count": k.usage_count,
             }
             for k in active_keys
         ]
+        for key in active_keys:
+            encrypted = encrypt_secret(key.api_key)
+            if encrypted != key.api_key:
+                key.api_key = encrypted
+                changed = True
+        if changed:
+            await db.commit()
         await AiClient().sync_keys(keys_payload)
     except Exception as e:
         logger.warning(f"Failed to sync AI keys to AI service: {e}")
@@ -426,14 +466,15 @@ async def create_ai_key(
 ):
     """Add a new AI API key for rotation. Admin only."""
     clean_key = payload.api_key.strip()
-    existing = await db.execute(select(AiApiKey).where(AiApiKey.api_key == clean_key))
-    if existing.scalar_one_or_none():
+    from app.core.secret_store import decrypt_secret, encrypt_secret
+    existing = await db.execute(select(AiApiKey).where(AiApiKey.provider == payload.provider.lower().strip()))
+    if any(decrypt_secret(key.api_key) == clean_key for key in existing.scalars().all()):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="API Key already exists")
 
     new_key = AiApiKey(
         provider=payload.provider.lower().strip(),
         key_name=payload.key_name.strip(),
-        api_key=clean_key,
+        api_key=encrypt_secret(clean_key),
         is_active=True,
     )
     db.add(new_key)

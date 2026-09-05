@@ -14,7 +14,7 @@ class QuizGenerateRequest(BaseModel):
 
 class QuizGenerateByCourseRequest(BaseModel):
     course_id: UUID
-    lesson_ids: list[UUID] | None = None
+    lesson_ids: list[UUID] | None = Field(default=None, max_length=100)
     quiz_type: str = Field(default="quick", pattern="^(quick|detailed)$")
     question_count: int = Field(default=10, ge=5, le=20)
 
@@ -30,7 +30,7 @@ class QuizAnswerItem(BaseModel):
 
 
 class QuizSubmitRequest(BaseModel):
-    answers: list[QuizAnswerItem]
+    answers: list[QuizAnswerItem] = Field(max_length=100)
 
 
 class QuizQuestionResponse(BaseModel):

@@ -8,6 +8,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     full_name: str | None = Field(default=None, max_length=255)
+    # Keep lecturer parseable for legacy clients; AuthService still rejects
+    # public lecturer registration and requires administrator provisioning.
     role: str = Field(default="student", pattern="^(student|lecturer)$")
 
 
@@ -17,15 +19,15 @@ class LoginRequest(BaseModel):
 
 
 class GoogleLoginRequest(BaseModel):
-    id_token: str
+    id_token: str = Field(min_length=20, max_length=8192)
 
 
 class FacebookLoginRequest(BaseModel):
-    access_token: str
+    access_token: str = Field(min_length=20, max_length=8192)
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class LogoutRequest(BaseModel):

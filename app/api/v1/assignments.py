@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.minio_client import MinioClient
+from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import (
     get_current_user,
@@ -18,6 +19,7 @@ from app.dependencies.auth import (
 from app.dependencies.course_auth import (
     get_lesson_with_course,
     verify_course_ownership,
+    verify_lesson_access,
 )
 from app.models import (
     Assignment,
@@ -33,7 +35,11 @@ from app.schemas.course_content import (
     SubmissionGrade,
     SubmissionResponse,
 )
-from app.utils.upload import read_upload_file_safely, sanitize_filename
+from app.utils.upload import (
+    read_upload_file_safely,
+    sanitize_filename,
+    validate_file_magic_bytes,
+)
 
 router = APIRouter(prefix="/lessons/{lesson_id}/assignment", tags=["Assignments"])
 
@@ -81,6 +87,7 @@ async def get_assignment(
     current_user: User = Depends(get_current_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
     result = await db.execute(select(Assignment).where(Assignment.lesson_id == lesson_id))
     return result.scalar_one_or_none()
 
@@ -166,13 +173,15 @@ async def upload_submission_file(
     current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
 
     # Verify student enrollment
     enrollment_result = await db.execute(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
             Enrollment.course_id == course.id,
-            Enrollment.status == "active"
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()
@@ -193,6 +202,11 @@ async def upload_submission_file(
     if ext not in allowed_exts:
         raise HTTPException(status_code=400, detail=f"File type '.{ext}' not allowed. Allowed: {', '.join(sorted(allowed_exts))}")
     content = await read_upload_file_safely(file, max_size_bytes=20 * 1024 * 1024)
+    if not validate_file_magic_bytes(content, ext):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Uploaded file content does not match expected signature for extension .{ext}."
+        )
     
     # Key: submissions/{assignment_id}/{student_id}/{uuid}.{ext}
     minio_key = f"submissions/{assignment.id}/{current_user.id}/{uuid.uuid4()}.{ext}"
@@ -223,12 +237,14 @@ async def create_submission(
     current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
 
     enrollment_result = await db.execute(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
             Enrollment.course_id == course.id,
-            Enrollment.status == "active"
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()
@@ -258,11 +274,29 @@ async def create_submission(
     if assignment.deadline and datetime.now() > assignment.deadline:
         is_late = True
 
+    normalized_attachments = []
+    for item in submission_data.attachments or []:
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail="Invalid attachment")
+        storage_key = item.get("storage_key") or item.get("file_url")
+        if not isinstance(storage_key, str) or not storage_key.startswith(("s3://", "file://")):
+            raise HTTPException(status_code=400, detail="Attachments must use managed storage")
+        clean_storage_key = storage_key.replace(f"s3://{settings.MINIO_BUCKET_NAME}/", "").replace("file://", "")
+        if not clean_storage_key.startswith(f"submissions/{assignment.id}/{current_user.id}/"):
+            raise HTTPException(status_code=400, detail="Attachment does not belong to this submission")
+        normalized_attachments.append({
+            "file_name": str(item.get("file_name", "attachment"))[:255],
+            "file_url": storage_key,
+            "storage_key": storage_key,
+            "file_type": str(item.get("file_type", ""))[:100],
+            "file_size": item.get("file_size"),
+        })
+
     submission = AssignmentSubmission(
         assignment_id=assignment.id,
         student_id=current_user.id,
         submission_text=submission_data.submission_text,
-        attachments=json.dumps(submission_data.attachments) if submission_data.attachments else None,
+        attachments=json.dumps(normalized_attachments) if normalized_attachments else None,
         is_late=is_late
     )
     db.add(submission)
@@ -292,6 +326,7 @@ async def get_my_submissions(
     current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
 
     result = await db.execute(select(Assignment).where(Assignment.lesson_id == lesson_id))
     assignment = result.scalar_one_or_none()
@@ -383,7 +418,12 @@ async def grade_submission(
     await verify_course_ownership(course, current_user)
 
     result = await db.execute(
-        select(AssignmentSubmission).where(AssignmentSubmission.id == submission_id)
+        select(AssignmentSubmission)
+        .join(Assignment, Assignment.id == AssignmentSubmission.assignment_id)
+        .where(
+            AssignmentSubmission.id == submission_id,
+            Assignment.lesson_id == lesson_id,
+        )
     )
     submission = result.scalar_one_or_none()
     if not submission:

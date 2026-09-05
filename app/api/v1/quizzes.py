@@ -21,7 +21,6 @@ from app.dependencies.course_auth import (
 from app.models import (
     Answer,
     Enrollment,
-    Lesson,
     Question,
     Quiz,
     QuizAttempt,
@@ -48,6 +47,39 @@ from app.schemas.course_content import (
 )
 
 router = APIRouter(prefix="/lessons/{lesson_id}/quiz", tags=["Quizzes"])
+
+
+async def _get_quiz_for_lesson(db: AsyncSession, lesson_id: UUID) -> Quiz:
+    result = await db.execute(select(Quiz).where(Quiz.lesson_id == lesson_id))
+    quiz = result.scalar_one_or_none()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found for this lesson")
+    return quiz
+
+
+async def _get_question_for_lesson(db: AsyncSession, question_id: UUID, lesson_id: UUID) -> Question:
+    result = await db.execute(
+        select(Question)
+        .join(Quiz, Quiz.id == Question.quiz_id)
+        .where(Question.id == question_id, Quiz.lesson_id == lesson_id)
+    )
+    question = result.scalar_one_or_none()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return question
+
+
+async def _get_answer_for_lesson(db: AsyncSession, answer_id: UUID, lesson_id: UUID) -> Answer:
+    result = await db.execute(
+        select(Answer)
+        .join(Question, Question.id == Answer.question_id)
+        .join(Quiz, Quiz.id == Question.quiz_id)
+        .where(Answer.id == answer_id, Quiz.lesson_id == lesson_id)
+    )
+    answer = result.scalar_one_or_none()
+    if not answer:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    return answer
 
 
 # ============ QUIZ ROUTES ============
@@ -297,10 +329,7 @@ async def create_question(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Quiz).where(Quiz.lesson_id == lesson_id))
-    quiz = result.scalar_one_or_none()
-    if not quiz:
-        raise HTTPException(status_code=400, detail="Quiz not found for this lesson")
+    quiz = await _get_quiz_for_lesson(db, lesson_id)
 
     question = Question(
         quiz_id=quiz.id,
@@ -338,10 +367,7 @@ async def update_question(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Question).where(Question.id == question_id))
-    question = result.scalar_one_or_none()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
+    question = await _get_question_for_lesson(db, question_id, lesson_id)
 
     for key, value in question_data.model_dump(exclude_unset=True).items():
         setattr(question, key, value)
@@ -361,10 +387,7 @@ async def delete_question(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Question).where(Question.id == question_id))
-    question = result.scalar_one_or_none()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
+    question = await _get_question_for_lesson(db, question_id, lesson_id)
 
     await db.delete(question)
     await db.commit()
@@ -381,13 +404,12 @@ async def reorder_questions(
     await verify_course_ownership(course, current_user)
 
     for idx, qid in enumerate(reorder_data.question_ids):
-        result = await db.execute(select(Question).where(Question.id == qid))
-        question = result.scalar_one_or_none()
-        if question:
-            question.order_index = idx
+        question = await _get_question_for_lesson(db, qid, lesson_id)
+        question.order_index = idx
 
     await db.commit()
-    result = await db.execute(select(Question).where(Question.quiz_id == Lesson.id).order_by(Question.order_index))
+    quiz = await _get_quiz_for_lesson(db, lesson_id)
+    result = await db.execute(select(Question).where(Question.quiz_id == quiz.id).order_by(Question.order_index))
     questions = result.scalars().all()
     return questions
 
@@ -405,10 +427,7 @@ async def create_answer(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Question).where(Question.id == question_id))
-    question = result.scalar_one_or_none()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
+    await _get_question_for_lesson(db, question_id, lesson_id)
 
     answer = Answer(
         question_id=question_id,
@@ -433,10 +452,7 @@ async def update_answer(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Answer).where(Answer.id == answer_id))
-    answer = result.scalar_one_or_none()
-    if not answer:
-        raise HTTPException(status_code=404, detail="Answer not found")
+    answer = await _get_answer_for_lesson(db, answer_id, lesson_id)
 
     for key, value in answer_data.model_dump(exclude_unset=True).items():
         setattr(answer, key, value)
@@ -456,10 +472,7 @@ async def delete_answer(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Answer).where(Answer.id == answer_id))
-    answer = result.scalar_one_or_none()
-    if not answer:
-        raise HTTPException(status_code=404, detail="Answer not found")
+    answer = await _get_answer_for_lesson(db, answer_id, lesson_id)
 
     await db.delete(answer)
     await db.commit()
@@ -475,10 +488,7 @@ async def toggle_correct_answer(
     lesson, course = await get_lesson_with_course(db, lesson_id)
     await verify_course_ownership(course, current_user)
 
-    result = await db.execute(select(Answer).where(Answer.id == answer_id))
-    answer = result.scalar_one_or_none()
-    if not answer:
-        raise HTTPException(status_code=404, detail="Answer not found")
+    answer = await _get_answer_for_lesson(db, answer_id, lesson_id)
 
     answer.is_correct = not answer.is_correct
     await db.commit()
@@ -500,7 +510,8 @@ async def start_quiz_attempt(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
             Enrollment.course_id == course.id,
-            Enrollment.status == "active"
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()
@@ -542,28 +553,31 @@ async def submit_quiz_attempt(
     current_user: User = Depends(require_active_user)
 ):
     lesson, course = await get_lesson_with_course(db, lesson_id)
+    await verify_lesson_access(lesson, course, current_user, db)
 
     result = await db.execute(
-        select(QuizAttempt).where(QuizAttempt.id == attempt_id)
+        select(QuizAttempt)
+        .join(Enrollment, Enrollment.id == QuizAttempt.enrollment_id)
+        .where(
+            QuizAttempt.id == attempt_id,
+            Enrollment.student_id == current_user.id,
+            Enrollment.course_id == course.id,
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
+        )
     )
     attempt = result.scalar_one_or_none()
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
 
-    # Verify attempt belongs to current user's enrollment
-    enrollment_check = await db.execute(
-        select(Enrollment).where(
-            Enrollment.id == attempt.enrollment_id,
-            Enrollment.student_id == current_user.id
-        )
-    )
-    if not enrollment_check.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Not authorized to submit this attempt")
-
     quiz_result = await db.execute(select(Quiz).where(Quiz.lesson_id == lesson_id))
     quiz = quiz_result.scalar_one_or_none()
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
+    if attempt.quiz_id != quiz.id:
+        raise HTTPException(status_code=403, detail="Attempt does not belong to this quiz")
+    if attempt.completed_at is not None:
+        raise HTTPException(status_code=409, detail="Quiz attempt has already been submitted")
 
     correct_count = 0
     total_points = 0
@@ -573,6 +587,10 @@ async def submit_quiz_attempt(
         select(Question).where(Question.quiz_id == quiz.id)
     )
     questions = questions_result.scalars().all()
+    question_ids = {str(question.id) for question in questions}
+    for submitted_answer in submission.answers:
+        if str(submitted_answer.get("question_id")) not in question_ids:
+            raise HTTPException(status_code=400, detail="Answer contains an invalid question")
 
     for question in questions:
         total_points += question.points
@@ -613,7 +631,9 @@ async def get_my_attempts(
     enrollment_result = await db.execute(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
-            Enrollment.course_id == course.id
+            Enrollment.course_id == course.id,
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     enrollment = enrollment_result.scalar_one_or_none()

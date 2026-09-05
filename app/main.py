@@ -37,6 +37,17 @@ async def lifespan(app: FastAPI):
     get_redis_client()
     # 2. Initialize AI Service Async Client Pool
     get_ai_client()
+    # Encrypt any AI keys created by versions that stored plaintext values.
+    try:
+        from app.core.database import AsyncSessionLocal
+        from app.core.secret_store import migrate_legacy_ai_keys
+
+        async with AsyncSessionLocal() as db:
+            migrated = await migrate_legacy_ai_keys(db)
+            if migrated:
+                logger.info("Encrypted %d legacy AI API key(s)", migrated)
+    except Exception:
+        logger.exception("Could not migrate legacy AI API keys")
     
     yield
     
@@ -66,7 +77,11 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Internal-API-Key"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+trusted_proxy_hosts = [host.strip() for host in settings.TRUSTED_PROXY_IPS.split(",") if host.strip()]
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=trusted_proxy_hosts or ["127.0.0.1", "::1"],
+)
 
 
 @app.middleware("http")
@@ -79,7 +94,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if not settings.DEBUG:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
     return response
 
 app.include_router(api_router, prefix="/api/v1")
@@ -101,8 +116,8 @@ async def readiness():
         redis = get_redis_client()
         if await redis.ping():
             checks["redis"] = "healthy"
-    except Exception as e:
-        checks["redis"] = f"unhealthy: {str(e)}"
+    except Exception:
+        checks["redis"] = "unhealthy"
 
     # Check Database
     try:
@@ -111,8 +126,8 @@ async def readiness():
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
         checks["database"] = "healthy"
-    except Exception as e:
-        checks["database"] = f"unhealthy: {str(e)}"
+    except Exception:
+        checks["database"] = "unhealthy"
 
     is_ready = all(v == "healthy" for v in checks.values())
     status_code = status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE

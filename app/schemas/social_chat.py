@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class SocialChatRoomCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
-    member_ids: list[UUID] = Field(default_factory=list)
+    member_ids: list[UUID] = Field(default_factory=list, max_length=50)
 
 
 class SocialChatMessageCreate(BaseModel):
@@ -17,7 +17,7 @@ class SocialChatMessageCreate(BaseModel):
 class SocialChatUserResponse(BaseModel):
     id: UUID
     full_name: str | None
-    email: str
+    email: str | None
     avatar_url: str | None
     role: str
 

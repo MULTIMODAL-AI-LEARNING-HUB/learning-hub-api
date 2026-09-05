@@ -62,6 +62,7 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Any = ["http://localhost:5173", *sorted(REQUIRED_CORS_ORIGINS)]
     FRONTEND_URL: str = "https://learninghubs.tech"
+    TRUSTED_PROXY_IPS: str = ""
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -84,6 +85,8 @@ class Settings(BaseSettings):
             raise ValueError(v)
 
         normalized = {str(origin).rstrip("/") for origin in origins if origin}
+        if "*" in normalized:
+            raise ValueError("Wildcard CORS origins are not allowed")
         return sorted(normalized | REQUIRED_CORS_ORIGINS)
 
     @field_validator("DATABASE_URL", mode="before")
@@ -162,8 +165,18 @@ class Settings(BaseSettings):
 
         # Additional production-only checks
         if not self.DEBUG:
-            if not self.MINIO_SECRET_KEY or self.MINIO_SECRET_KEY == "minioadmin123":
-                raise ValueError("MINIO_SECRET_KEY must not be the default value in production")
+            if self.MINIO_ACCESS_KEY == "minioadmin" or self.MINIO_SECRET_KEY in {"", "minioadmin123"}:
+                raise ValueError("MINIO credentials must not use default values in production")
+            if not self.MINIO_SECURE:
+                raise ValueError("MINIO_SECURE must be true in production")
+            self.CORS_ORIGINS = [origin for origin in self.CORS_ORIGINS if "localhost" not in origin and "127.0.0.1" not in origin]
+            if any(not origin.startswith("https://") for origin in self.CORS_ORIGINS):
+                raise ValueError("Production CORS origins must use HTTPS")
+            if not self.FRONTEND_URL.startswith("https://"):
+                raise ValueError("FRONTEND_URL must use HTTPS in production")
+
+        if self.ALGORITHM != "HS256":
+            raise ValueError("Only the configured HS256 JWT algorithm is supported")
         return self
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

@@ -69,7 +69,7 @@ def _to_response(course) -> CourseResponse:
 async def list_courses(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    search: str | None = None,
+    search: str | None = Query(default=None, max_length=200),
     category_id: UUID | None = None,
     min_price: int | None = None,
     max_price: int | None = None,
@@ -225,17 +225,16 @@ async def get_course(
     current_user: User = Depends(get_current_user),
 ) -> CourseDetailResponse:
     """Get course details with materials and enrollment counts."""
-    cache = RedisCache()
-    cache_key = RedisCache.cache_key_course_detail(course_id)
-    cached = await cache.get(cache_key)
-    if cached:
-        return CourseDetailResponse(**cached)
-
     repo = CourseRepository(db)
     service = CourseService(repo)
 
     course = await service.get_by_id_with_materials(course_id)
     if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    from app.dependencies.course_auth import verify_course_access
+    can_access = await verify_course_access(course, current_user, db)
+    if course.status != "published" and not can_access:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
     material_repo = CourseMaterialRepository(db)
@@ -263,11 +262,10 @@ async def get_course(
         updated_at=course.updated_at,
         lecturer=course.lecturer,
         category=course.category,
-        materials_count=materials_count,
+        materials_count=materials_count if can_access else 0,
         enrolled_count=enrolled_count,
-        materials=course.materials if course.materials else [],
+        materials=course.materials if can_access and course.materials else [],
     )
-    await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_COURSES)
     return response
 
 
@@ -511,6 +509,17 @@ async def send_student_reminder(
         raise HTTPException(status_code=404, detail="Course not found")
     if course.lecturer_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
+
+    enrolled = await db.execute(
+        select(Enrollment.id).where(
+            Enrollment.course_id == course_id,
+            Enrollment.student_id == student_id,
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
+        )
+    )
+    if enrolled.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Enrolled student not found")
 
     notification = Notification(
         user_id=student_id,

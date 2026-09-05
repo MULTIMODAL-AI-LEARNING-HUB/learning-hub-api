@@ -5,23 +5,33 @@ import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clients.minio_client import MinioClient
+from app.clients.minio_client import LOCAL_STORAGE_DIR, MinioClient
 from app.core.cache import RedisCache
 from app.core.config import settings
 
 # Core/Client integrations
 from app.core.limiter import limiter
 from app.dependencies.auth import get_current_user
+from app.dependencies.course_auth import verify_course_access
 from app.dependencies.db import get_db
+from app.models.course import Course
+from app.models.course_content import Attachment, Lesson, Section
+from app.models.course_material import CourseMaterial
 from app.models.document import Document
 from app.models.user import User
 from app.repositories.document_repo import DocumentRepository
 from app.schemas import DocumentListResponse, DocumentResponse, DocumentUploadResponse
 from app.tasks.document_tasks import dispatch_process_document
 from app.utils.pagination import build_pagination
-from app.utils.upload import read_upload_file_safely, sanitize_filename
+from app.utils.upload import (
+    read_upload_file_safely,
+    sanitize_filename,
+    validate_file_magic_bytes,
+)
 
 router = APIRouter()
 
@@ -69,6 +79,11 @@ async def upload(
 
     # 2. File size calculation & Quota validation (100MB hard limit per file)
     content = await read_upload_file_safely(file, max_size_bytes=100 * 1024 * 1024)
+    if not validate_file_magic_bytes(content, ext):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Uploaded file content does not match expected signature for extension .{ext}."
+        )
     file_size_bytes = len(content)
     file_size_mb = file_size_bytes / (1024 * 1024)
 
@@ -215,14 +230,54 @@ async def delete_document(
     await RedisCache().delete_pattern(f"cache:docs:{current_user.id}:*")
 
 
-@router.get("/raw/{filename}")
-async def get_raw_storage_file(filename: str):
-    """Serve files directly from local storage fallback."""
-    from fastapi.responses import FileResponse
-    from app.clients.minio_client import LOCAL_STORAGE_DIR
-
-    file_path = LOCAL_STORAGE_DIR / filename
-    if not file_path.exists():
+@router.get("/raw/{filename:path}")
+async def get_raw_storage_file(
+    filename: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serve a local fallback object only after ownership/access verification."""
+    clean_key = filename.lstrip("/")
+    storage_root = LOCAL_STORAGE_DIR.resolve()
+    file_path = (storage_root / clean_key).resolve()
+    if not file_path.is_relative_to(storage_root) or not file_path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    return FileResponse(file_path)
+
+    storage_values = (clean_key, f"file://{clean_key}", f"s3://{settings.MINIO_BUCKET_NAME}/{clean_key}")
+    document = (await db.execute(
+        select(Document).where(
+            Document.user_id == current_user.id,
+            (Document.storage_key.in_(storage_values) | Document.file_url.in_(storage_values)),
+        )
+    )).scalar_one_or_none()
+    if document:
+        return FileResponse(file_path, filename=document.file_name, media_type="application/octet-stream")
+
+    material_result = await db.execute(
+        select(CourseMaterial, Course)
+        .join(Course, Course.id == CourseMaterial.course_id)
+        .where(
+            CourseMaterial.storage_key.in_(storage_values) | CourseMaterial.file_url.in_(storage_values)
+        )
+    )
+    material_row = material_result.first()
+    if material_row:
+        material, course = material_row
+        if await verify_course_access(course, current_user, db):
+            return FileResponse(file_path, filename=material.file_name, media_type="application/octet-stream")
+
+    attachment_result = await db.execute(
+        select(Attachment, Course)
+        .join(Lesson, Lesson.id == Attachment.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .join(Course, Course.id == Section.course_id)
+        .where(Attachment.file_url.in_(storage_values))
+    )
+    attachment_row = attachment_result.first()
+    if attachment_row:
+        attachment, course = attachment_row
+        if await verify_course_access(course, current_user, db):
+            return FileResponse(file_path, filename=attachment.file_name, media_type="application/octet-stream")
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 

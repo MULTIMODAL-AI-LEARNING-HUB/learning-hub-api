@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.cache import RedisCache
 
 # Core/Limiter imports
 from app.core.limiter import limiter
 from app.dependencies.auth import get_current_user
+from app.dependencies.course_auth import verify_course_access
 from app.dependencies.db import get_db
 from app.models.essay import EssaySubmission
 from app.models.flashcard import Flashcard
@@ -51,6 +53,7 @@ async def generate_quiz(
     from app.tasks.quiz_tasks import dispatch_generate_quiz
 
     job_id = dispatch_generate_quiz(str(payload.document_id), payload.quiz_type, payload.question_count)
+    await RedisCache().set(RedisCache.cache_key_quiz_job(job_id), str(current_user.id), ttl=settings.REDIS_CACHE_TTL_QUIZ)
     return QuizJobResponse(job_id=job_id, status="processing")
 
 
@@ -64,14 +67,12 @@ async def generate_quiz_by_course(
 ) -> QuizJobResponse:
     """Trigger quiz generation from course materials via AI service."""
     from app.repositories.course_repo import CourseRepository
-    from app.repositories.enrollment_repo import EnrollmentRepository
 
     course = await CourseRepository(db).get_by_id(payload.course_id)
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    enrollment = await EnrollmentRepository(db).get_by_user_and_course(current_user.id, payload.course_id)
-    if not enrollment and course.price_vnd > 0:
+    if not await verify_course_access(course, current_user, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You must be enrolled to generate quiz from this course"
@@ -85,6 +86,7 @@ async def generate_quiz_by_course(
         payload.quiz_type,
         payload.question_count
     )
+    await RedisCache().set(RedisCache.cache_key_quiz_job(job_id), str(current_user.id), ttl=settings.REDIS_CACHE_TTL_QUIZ)
     return QuizJobResponse(job_id=job_id, status="processing")
 
 
@@ -95,6 +97,10 @@ async def get_quiz_job(
     current_user: User = Depends(get_current_user),
 ):
     """Retrieve status or results of a background quiz generation job."""
+    owner = await RedisCache().get(RedisCache.cache_key_quiz_job(job_id))
+    if owner is None or str(owner) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz job not found")
+
     from app.tasks.quiz_tasks import get_quiz_job_status
     return get_quiz_job_status(job_id)
 
@@ -108,6 +114,10 @@ async def submit_quiz(
 ) -> QuizResultResponse:
     """Submit answers to a generated quiz and get correct answers comparison."""
     from app.tasks.quiz_tasks import get_quiz_results
+
+    owner = await RedisCache().get(RedisCache.cache_key_quiz_job(str(quiz_id)))
+    if owner is None or str(owner) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
 
     results = get_quiz_results(str(quiz_id), [a.model_dump() for a in payload.answers])
     correct = sum(1 for r in results if r["correct"])

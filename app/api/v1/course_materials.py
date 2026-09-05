@@ -22,7 +22,41 @@ from app.schemas import (
     CourseMaterialResponse,
     CourseMaterialUpdate,
 )
-from app.utils.upload import read_upload_file_safely, sanitize_filename
+from app.utils.upload import (
+    read_upload_file_safely,
+    sanitize_filename,
+    validate_file_magic_bytes,
+)
+
+
+def _is_private_or_loopback_host(hostname: str) -> bool:
+    import ipaddress
+    lowered = hostname.lower().strip(".")
+    if lowered == "localhost" or lowered.endswith(".localhost") or lowered.endswith(".local") or lowered.endswith(".internal"):
+        return True
+    try:
+        ip = ipaddress.ip_address(lowered)
+        return (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        )
+    except ValueError:
+        return False
+
+
+def _validate_external_url(url: str) -> str:
+    from urllib.parse import urlparse
+    value = url.strip()
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise HTTPException(status_code=400, detail="External materials must use a valid HTTPS URL")
+    if _is_private_or_loopback_host(parsed.hostname):
+        raise HTTPException(status_code=400, detail="External URL must not point to private or loopback addresses")
+    return value
 
 router = APIRouter(prefix="/{course_id}/materials", tags=["course-materials"])
 
@@ -100,6 +134,11 @@ async def upload_material(
         )
 
     content = await read_upload_file_safely(file, max_size_bytes=100 * 1024 * 1024)
+    if not validate_file_magic_bytes(content, ext):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Uploaded file content does not match expected signature for extension .{ext}."
+        )
     file_size_bytes = len(content)
 
     minio_key = f"course_materials/{course_id}/{uuid.uuid4()}.{ext}"
@@ -144,7 +183,7 @@ async def upload_material(
 @router.post("/external", response_model=CourseMaterialResponse, status_code=201)
 async def add_external_url(
     course_id: UUID,
-    url: str = Query(...),
+    url: str = Query(..., min_length=12, max_length=500),
     material_type: str = Query(default="reference"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_lecturer),
@@ -152,13 +191,14 @@ async def add_external_url(
     """Add an external URL as course material. Lecturer or Admin only."""
     course = await get_course_or_404(db, course_id)
     await verify_course_ownership(course, current_user)
+    valid_url = _validate_external_url(url)
 
     repo = CourseMaterialRepository(db)
     material = CourseMaterial(
         course_id=course_id,
         lecturer_id=current_user.id,
         file_type="url",
-        external_url=url,
+        external_url=valid_url,
         status="ready",
         material_type=material_type,
     )

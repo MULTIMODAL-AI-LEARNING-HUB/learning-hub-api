@@ -88,7 +88,8 @@ async def create_announcement(
     enrollments_result = await db.execute(
         select(Enrollment.student_id).where(
             Enrollment.course_id == course_id,
-            Enrollment.status == "active"
+            Enrollment.status.in_(["active", "completed"]),
+            Enrollment.payment_status == "paid",
         )
     )
     student_ids = enrollments_result.scalars().all()

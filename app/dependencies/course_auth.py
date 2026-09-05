@@ -75,12 +75,16 @@ async def verify_course_ownership(course: Course, current_user: User) -> None:
 
 
 async def has_active_enrollment(db: AsyncSession, student_id: UUID, course_id: UUID) -> bool:
-    """Check if student has an active or completed enrollment in the course."""
+    """Check if the student has a paid, active/completed enrollment."""
     result = await db.execute(
         select(Enrollment.id).where(
             Enrollment.student_id == student_id,
             Enrollment.course_id == course_id,
-            Enrollment.status.in_(["active", "completed"])
+            Enrollment.status.in_(["active", "completed"]),
+            # An enrollment is not access-granting until the payment has been
+            # confirmed. This prevents payment-intent creation from opening
+            # the course paywall.
+            Enrollment.payment_status == "paid",
         )
     )
     return result.scalar_one_or_none() is not None
@@ -115,10 +119,9 @@ async def verify_lesson_access(
     If lesson is preview, anyone logged in can view it.
     Otherwise, full course access is required.
     """
-    if lesson.is_preview:
-        return
-
     can_access = await verify_course_access(course, current_user, db)
+    if lesson.is_preview and course.status == "published":
+        return
     if not can_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

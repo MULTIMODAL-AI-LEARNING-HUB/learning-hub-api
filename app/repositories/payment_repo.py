@@ -22,10 +22,11 @@ class PaymentRepository(BaseRepository):
         )
         return result.scalar_one_or_none()
 
-    async def get_by_transaction_id(self, transaction_id: str) -> Payment | None:
-        result = await self.db.execute(
-            select(Payment).where(Payment.transaction_id == transaction_id)
-        )
+    async def get_by_transaction_id(self, transaction_id: str, *, for_update: bool = False) -> Payment | None:
+        query = select(Payment).where(Payment.transaction_id == transaction_id)
+        if for_update:
+            query = query.with_for_update()
+        result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def list_by_student(self, student_id: UUID) -> list[Payment]:
@@ -50,8 +51,10 @@ class PaymentRepository(BaseRepository):
         status: str,
         paid_at: datetime | None = None
     ) -> Payment | None:
-        payment = await self.get_by_transaction_id(transaction_id)
+        payment = await self.get_by_transaction_id(transaction_id, for_update=True)
         if payment:
+            if payment.payment_status in {"completed", "failed"}:
+                return payment
             payment.payment_status = status
             if paid_at:
                 payment.paid_at = paid_at

@@ -31,7 +31,8 @@ class EnrollmentRepository(BaseRepository):
                 and_(
                     Enrollment.student_id == student_id,
                     Enrollment.course_id == course_id,
-                    Enrollment.status == "active"
+                    Enrollment.status.in_(["active", "completed"]),
+                    Enrollment.payment_status == "paid",
                 )
             )
         )

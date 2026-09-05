@@ -17,6 +17,20 @@ services:
         value: 8000
       - key: DATABASE_URL
         sync: false # Bạn sẽ điền chuỗi kết nối Supabase lúc deploy
+      - key: SECRET_KEY
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: MINIO_ENDPOINT
+        sync: false
+      - key: MINIO_ACCESS_KEY
+        sync: false
+      - key: MINIO_SECRET_KEY
+        sync: false
+      - key: MINIO_BUCKET_NAME
+        value: learning-hub-uat-storage
+      - key: MINIO_SECURE
+        value: "true"
       - key: REDIS_URL
         fromService:
           type: redis
@@ -50,6 +64,8 @@ services:
         sync: false # Điền API Key của Gemini lúc deploy
       - key: GROQ_API_KEY
         sync: false # Điền API Key của Groq lúc deploy
+      - key: INTERNAL_API_KEY
+        sync: false
 
   # 4. Celery Worker (Background Worker xử lý file nặng chạy ngầm)
   - type: worker
@@ -80,3 +96,9 @@ services:
         sync: false # Điền Secret Key của R2 lúc deploy
       - key: MINIO_BUCKET_NAME
         value: learning-hub-uat-storage
+      - key: MINIO_SECURE
+        value: "true"
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: AI_SERVICE_URL
+        value: http://learning-hub-ai:8001

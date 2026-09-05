@@ -36,7 +36,10 @@ class EnrollmentService:
             payment_status="pending",
             payment_method=payment_method,
             transaction_id=transaction_id,
-            status="active"
+            # Paid enrollments remain pending until a verified gateway
+            # callback confirms the payment. Free enrollments are confirmed
+            # immediately by the caller.
+            status="active" if amount_vnd == 0 else "pending"
         )
         enrollment = await self.enrollment_repo.create(enrollment)
 
@@ -58,11 +61,31 @@ class EnrollmentService:
         transaction_id: str,
         payment_status: str = "completed"
     ) -> tuple[Enrollment | None, Payment | None]:
+        if payment_status not in {"completed", "failed"}:
+            raise ValueError("Unsupported payment status")
+
+        payment = await self.payment_repo.get_by_transaction_id(transaction_id)
+
+        if not payment:
+            return None, None
+
+        # Payment states are terminal. This prevents a delayed/replayed failed
+        # callback from revoking access after a verified successful payment,
+        # and prevents a later callback from resurrecting a failed order.
+        if payment.payment_status == "completed":
+            enrollment = await self.enrollment_repo.get_by_id(payment.enrollment_id) if payment.enrollment_id else None
+            return enrollment, payment
+        if payment.payment_status == "failed":
+            return None, payment
+
         paid_at = datetime.now(timezone.utc).replace(tzinfo=None) if payment_status == "completed" else None
         payment = await self.payment_repo.update_status(transaction_id, payment_status, paid_at)
 
         if not payment:
             return None, None
+        if payment.payment_status != payment_status:
+            enrollment = await self.enrollment_repo.get_by_id(payment.enrollment_id) if payment.enrollment_id else None
+            return enrollment, payment
 
         enrollment = None
         if payment.enrollment_id and payment_status == "completed":
@@ -72,7 +95,12 @@ class EnrollmentService:
                 payment_method=payment.payment_method,
                 transaction_id=payment.transaction_id
             )
+            await self.enrollment_repo.update_status(payment.enrollment_id, "active")
             enrollment = await self.enrollment_repo.get_by_id(payment.enrollment_id)
+        elif payment.enrollment_id:
+            # A failed payment must never leave an access-granting pending
+            # enrollment behind.
+            await self.enrollment_repo.update_status(payment.enrollment_id, "cancelled")
 
         return enrollment, payment
 

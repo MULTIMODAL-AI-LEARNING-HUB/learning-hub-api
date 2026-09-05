@@ -38,6 +38,10 @@ async def vnpay_return(
     enrollment_service = EnrollmentService(enrollment_repo, payment_repo, course_repo)
 
     payment_status = "completed" if result["is_success"] else "failed"
+    payment = await payment_repo.get_by_transaction_id(transaction_id)
+    if not payment or payment.payment_method != "vnpay" or int(result["amount"]) != payment.amount_vnd:
+        logger.warning("VNPay callback order/amount mismatch for txn %s", transaction_id)
+        raise HTTPException(status_code=400, detail="Payment order mismatch")
     enrollment, _ = await enrollment_service.confirm_payment(transaction_id, payment_status)
 
     if not enrollment:
@@ -86,8 +90,16 @@ async def vnpay_ipn(
         return {"RspCode": "01", "Message": "Order not found"}
 
     # Check if order is already confirmed to avoid repeating processes
-    if payment.status in {"completed", "failed"}:
+    if payment.payment_status in {"completed", "failed"}:
         return {"RspCode": "02", "Message": "Order already confirmed"}
+
+    try:
+        callback_amount = int(result.get("amount", 0))
+    except (TypeError, ValueError):
+        callback_amount = -1
+    if payment.payment_method != "vnpay" or callback_amount != payment.amount_vnd:
+        logger.warning("VNPay IPN order/amount mismatch for txn %s", transaction_id)
+        return {"RspCode": "04", "Message": "Order mismatch"}
 
     enrollment_service = EnrollmentService(enrollment_repo, payment_repo, course_repo)
     payment_status = "completed" if result["is_success"] else "failed"
@@ -124,6 +136,14 @@ async def momo_return(
     enrollment_service = EnrollmentService(enrollment_repo, payment_repo, course_repo)
 
     payment_status = "completed" if result["is_success"] else "failed"
+    payment = await payment_repo.get_by_transaction_id(transaction_id)
+    try:
+        callback_amount = int(result.get("amount", 0))
+    except (TypeError, ValueError):
+        callback_amount = -1
+    if not payment or payment.payment_method != "momo" or callback_amount != payment.amount_vnd:
+        logger.warning("MoMo callback order/amount mismatch for txn %s", transaction_id)
+        raise HTTPException(status_code=400, detail="Payment order mismatch")
     enrollment, _ = await enrollment_service.confirm_payment(transaction_id, payment_status)
 
     return {
@@ -169,8 +189,16 @@ async def momo_ipn(
         return {"resultCode": 1001, "message": "Order not found"}
 
     # Check if order is already confirmed
-    if payment.status in {"completed", "failed"}:
+    if payment.payment_status in {"completed", "failed"}:
         return {"resultCode": 0, "message": "Order already confirmed"}
+
+    try:
+        callback_amount = int(result.get("amount", 0))
+    except (TypeError, ValueError):
+        callback_amount = -1
+    if payment.payment_method != "momo" or callback_amount != payment.amount_vnd:
+        logger.warning("MoMo IPN order/amount mismatch for txn %s", transaction_id)
+        return {"resultCode": 1003, "message": "Order mismatch"}
 
     enrollment_service = EnrollmentService(enrollment_repo, payment_repo, course_repo)
     payment_status = "completed" if result["is_success"] else "failed"

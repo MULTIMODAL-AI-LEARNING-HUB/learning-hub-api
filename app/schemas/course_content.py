@@ -108,10 +108,10 @@ class AttachmentResponse(BaseModel):
 
 
 class AttachmentCreate(BaseModel):
-    file_name: str
-    file_url: str
-    file_type: Optional[str] = None
-    file_size: Optional[int] = None
+    file_name: str = Field(min_length=1, max_length=255)
+    file_url: str = Field(min_length=1, max_length=1000)
+    file_type: Optional[str] = Field(default=None, max_length=100)
+    file_size: Optional[int] = Field(default=None, ge=0, le=100 * 1024 * 1024)
 
 
 # ============ QUIZ SCHEMAS ============
@@ -248,7 +248,7 @@ class QuizAttemptStart(BaseModel):
 
 
 class QuizAttemptSubmit(BaseModel):
-    answers: List[dict] = Field(..., description="List of answers: [{\"question_id\": \"...\", \"selected_answers\": [\"answer_id1\", \"answer_id2\"]}]")
+    answers: List[dict] = Field(..., max_length=100, description="List of answers: [{\"question_id\": \"...\", \"selected_answers\": [\"answer_id1\", \"answer_id2\"]}]")
 
 
 class QuizAttemptResponse(BaseModel):

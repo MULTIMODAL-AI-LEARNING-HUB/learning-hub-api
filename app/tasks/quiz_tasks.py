@@ -55,7 +55,7 @@ def get_quiz_job_status(job_id: str) -> dict:
         return {
             "job_id": job_id,
             "status": "failed",
-            "error": str(res.result)
+            "error": "Quiz generation failed"
         }
     else:
         return {

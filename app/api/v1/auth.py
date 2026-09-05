@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import RedisCache
@@ -31,6 +31,33 @@ from app.schemas import (
 from app.services.auth_service import AuthService
 
 router = APIRouter()
+REFRESH_COOKIE_NAME = "refresh_token"
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        httponly=True,
+        secure=not settings.DEBUG,
+        # The deployed web and API may be on different registrable domains;
+        # cross-site cookies are safe here because CORS is an explicit allowlist
+        # and the token is HttpOnly.
+        samesite="none" if not settings.DEBUG else "lax",
+        path="/api/v1/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(REFRESH_COOKIE_NAME, path="/api/v1/auth")
+
+
+def _enforce_cookie_csrf(request: Request) -> None:
+    """Reject cross-origin browser requests that authenticate via cookies."""
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") not in settings.CORS_ORIGINS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-origin request rejected")
 
 
 def _build_user_response(user: User) -> AuthUserResponse:
@@ -62,17 +89,20 @@ def _build_user_response(user: User) -> AuthUserResponse:
 async def register(
     request: Request,
     payload: RegisterRequest,
-    db: AsyncSession = Depends(get_db)
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
     """Register a new user, automatically provisioning a default quota."""
     service = AuthService(UserRepository(db))
     user = await service.register(payload.email, payload.password, payload.full_name, payload.role)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
-    return AuthResponse(
+    result = AuthResponse(
         user=_build_user_response(user),
-        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+        token=TokenResponse(access_token=access_token)
     )
+    _set_refresh_cookie(response, refresh_token)
+    return result
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -80,31 +110,38 @@ async def register(
 async def login(
     request: Request,
     payload: LoginRequest,
-    db: AsyncSession = Depends(get_db)
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
     """Authenticate credentials and return JWT tokens."""
     service = AuthService(UserRepository(db))
     user = await service.authenticate(payload.email, payload.password)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
-    return AuthResponse(
+    result = AuthResponse(
         user=_build_user_response(user),
-        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+        token=TokenResponse(access_token=access_token)
     )
+    _set_refresh_cookie(response, refresh_token)
+    return result
 
 
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
     request: Request,
+    response: Response,
     payload: LogoutRequest = LogoutRequest(),
 ) -> MessageResponse:
     """Invalidate refresh token and log user out."""
-    if payload and payload.refresh_token:
-        token_payload = decode_token(payload.refresh_token)
+    _enforce_cookie_csrf(request)
+    refresh_token = (payload.refresh_token if payload else None) or request.cookies.get(REFRESH_COOKIE_NAME)
+    if refresh_token:
+        token_payload = decode_token(refresh_token)
         if token_payload and token_payload.get("type") == "refresh":
             jti = token_payload.get("jti")
             if jti:
                 await AuthService.invalidate_refresh_token(jti)
+    _clear_refresh_cookie(response)
     return MessageResponse(message="Successfully logged out")
 
 
@@ -113,17 +150,20 @@ async def logout(
 async def google_login(
     request: Request,
     payload: GoogleLoginRequest,
-    db: AsyncSession = Depends(get_db)
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
     """Authenticate via Google ID token, creating or updating user, and returning JWT tokens."""
     service = AuthService(UserRepository(db))
     user = await service.google_login(payload.id_token)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
-    return AuthResponse(
+    result = AuthResponse(
         user=_build_user_response(user),
-        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+        token=TokenResponse(access_token=access_token)
     )
+    _set_refresh_cookie(response, refresh_token)
+    return result
 
 
 @router.post("/facebook", response_model=AuthResponse)
@@ -131,17 +171,20 @@ async def google_login(
 async def facebook_login(
     request: Request,
     payload: FacebookLoginRequest,
-    db: AsyncSession = Depends(get_db)
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
     """Authenticate via Facebook access token, creating or updating user, and returning JWT tokens."""
     service = AuthService(UserRepository(db))
     user = await service.facebook_login(payload.access_token)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
-    return AuthResponse(
+    result = AuthResponse(
         user=_build_user_response(user),
-        token=TokenResponse(access_token=access_token, refresh_token=refresh_token)
+        token=TokenResponse(access_token=access_token)
     )
+    _set_refresh_cookie(response, refresh_token)
+    return result
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -149,10 +192,15 @@ async def facebook_login(
 async def refresh(
     request: Request,
     payload: RefreshRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ) -> TokenResponse:
     """Exchange a valid refresh token for a new pair of access and refresh tokens."""
-    token_payload = decode_token(payload.refresh_token)
+    _enforce_cookie_csrf(request)
+    refresh_token = payload.refresh_token or request.cookies.get(REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required")
+    token_payload = decode_token(refresh_token)
     if not token_payload or token_payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
@@ -167,16 +215,21 @@ async def refresh(
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked")
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception:
             import logging
-            logging.error(f"Redis error checking revoked token for jti {jti}: {e}")
+            logging.exception("Redis error checking refresh-token revocation")
+            raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
 
     user_id = token_payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     repo = UserRepository(db)
-    user = await repo.get_by_id(UUID(user_id))
+    try:
+        refresh_user_id = UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    user = await repo.get_by_id(refresh_user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
@@ -187,12 +240,14 @@ async def refresh(
 
     # Revoke the old refresh token
     if jti:
-        await AuthService.invalidate_refresh_token(jti)
+        if not await AuthService.invalidate_refresh_token(jti):
+            raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
 
     service = AuthService(repo)
     access_token = service.build_access_token(user.id, user.token_version or 0)
     refresh_token = service.build_refresh_token(user.id, user.token_version or 0)
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    _set_refresh_cookie(response, refresh_token)
+    return TokenResponse(access_token=access_token)
 
 
 @router.get("/me", response_model=AuthUserResponse)

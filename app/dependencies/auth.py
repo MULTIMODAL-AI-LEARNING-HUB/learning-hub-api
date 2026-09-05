@@ -26,9 +26,14 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     from sqlalchemy.orm import selectinload
+    try:
+        user_uuid = UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
     result = await db.execute(
         select(User)
-        .where(User.id == UUID(user_id))
+        .where(User.id == user_uuid)
         .options(selectinload(User.quota))
     )
     user = result.scalar_one_or_none()

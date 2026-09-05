@@ -26,6 +26,13 @@ from app.schemas.social_chat import (
 router = APIRouter(prefix="/social-chat", tags=["social-chat"])
 
 
+def _masked_email(email: str) -> str:
+    local, separator, domain = email.partition("@")
+    if not separator:
+        return ""
+    return f"{local[:1]}***@{domain}"
+
+
 async def ensure_room_member(room_id: UUID, user: User, db: AsyncSession) -> SocialChatRoom:
     room = await db.get(SocialChatRoom, room_id)
     if not room:
@@ -78,7 +85,7 @@ async def search_users(
         )
     ).scalars().all()
     return [
-        SocialChatUserResponse(id=user.id, full_name=user.full_name, email=user.email, avatar_url=user.avatar_url, role=user.role)
+        SocialChatUserResponse(id=user.id, full_name=user.full_name, email=_masked_email(user.email), avatar_url=user.avatar_url, role=user.role)
         for user in users
     ]
 

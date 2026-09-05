@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.course_auth import (
     get_section_with_course,
+    verify_course_access,
     verify_course_ownership,
     verify_lesson_access,
 )
@@ -39,6 +40,8 @@ async def list_lessons(
     current_user: User = Depends(get_current_user)
 ):
     section, course = await get_section_with_course(db, section_id)
+    if not await verify_course_access(course, current_user, db):
+        raise HTTPException(status_code=403, detail="Enrollment required to access this course")
 
     result = await db.execute(
         select(Lesson)

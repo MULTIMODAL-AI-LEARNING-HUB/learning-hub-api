@@ -71,11 +71,11 @@ REDIS_URL=redis://localhost:6379/0
 
 # External Services
 AI_SERVICE_URL=http://localhost:8001
-AI_SERVICE_API_KEY=your_key
+INTERNAL_API_KEY=CHANGEME_generate_a_shared_service_key
 MINIO_ENDPOINT=localhost:9000
 
 # Auth
-SECRET_KEY=your_secret_key
+SECRET_KEY=CHANGEME_generate_a_random_secret
 ALGORITHM=HS256
 ```
 

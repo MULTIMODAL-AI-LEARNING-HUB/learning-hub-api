@@ -26,10 +26,10 @@ class AuthService:
         self.repo = repo
 
     async def register(self, email: str, password: str, full_name: str | None, role: str = "student") -> User:
-        if role not in ("student", "lecturer"):
+        if role != "student":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Registration only allows 'student' or 'lecturer' roles"
+                detail="Lecturer accounts must be provisioned by an administrator"
             )
 
         existing = await self.repo.get_by_email(email)
@@ -71,10 +71,10 @@ class AuthService:
                     )
             except HTTPException:
                 raise
-            except Exception as e:
-                # Do not crash the app if Redis limit is exceeded or offline
+            except Exception:
                 import logging
-                logging.error(f"Redis error checking lockout for {email}: {e}")
+                logging.exception("Redis error checking login lockout")
+                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
 
         if not user or not user.password_hash or not verify_password(password, user.password_hash):
             # Track failed attempt
@@ -93,9 +93,10 @@ class AuthService:
                         )
                 except HTTPException:
                     raise
-                except Exception as e:
+                except Exception:
                     import logging
-                    logging.error(f"Redis error tracking login failure for {email}: {e}")
+                    logging.exception("Redis error tracking login failure")
+                    raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
         # Clear failed attempts on successful login
@@ -126,13 +127,17 @@ class AuthService:
                 from google.auth.transport import requests as google_requests
                 from google.oauth2 import id_token
 
-                audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
+                if not settings.GOOGLE_CLIENT_ID:
+                    raise ValueError("Google OAuth client is not configured")
+                audience = settings.GOOGLE_CLIENT_ID
                 id_info = id_token.verify_oauth2_token(
                     token_str,
                     google_requests.Request(),
                     audience=audience
                 )
                 email = id_info.get("email")
+                if not id_info.get("email_verified", False):
+                    raise ValueError("Google email is not verified")
                 google_id = id_info.get("sub")
                 full_name = id_info.get("name")
                 avatar_url = id_info.get("picture")
@@ -152,6 +157,8 @@ class AuthService:
                     if resp.status_code == 200:
                         data = resp.json()
                         email = data.get("email")
+                        if not data.get("verified_email", False):
+                            email = None
                         google_id = data.get("sub")
                         full_name = data.get("name")
                         avatar_url = data.get("picture")
@@ -179,8 +186,34 @@ class AuthService:
 
     async def facebook_login(self, access_token: str) -> User:
         import httpx
+
+        if not settings.FACEBOOK_APP_ID or not settings.FACEBOOK_APP_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Facebook login is not configured",
+            )
+
         try:
             async with httpx.AsyncClient() as client:
+                debug_resp = await client.get(
+                    "https://graph.facebook.com/debug_token",
+                    params={
+                        "input_token": access_token,
+                        "access_token": f"{settings.FACEBOOK_APP_ID}|{settings.FACEBOOK_APP_SECRET}",
+                    },
+                    timeout=10.0,
+                )
+                debug_data = debug_resp.json() if debug_resp.status_code == 200 else {}
+                token_data = debug_data.get("data", {})
+                if (
+                    not token_data.get("is_valid")
+                    or str(token_data.get("app_id")) != str(settings.FACEBOOK_APP_ID)
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid Facebook access token",
+                    )
+
                 resp = await client.get(
                     "https://graph.facebook.com/me",
                     params={
@@ -195,6 +228,11 @@ class AuthService:
                         detail="Invalid Facebook access token"
                     )
                 fb_data = resp.json()
+                if str(fb_data.get("id")) != str(token_data.get("user_id")):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid Facebook access token",
+                    )
         except HTTPException:
             raise
         except Exception as e:
@@ -259,12 +297,14 @@ class AuthService:
         return create_refresh_token({"sub": str(user_id), "ver": token_version})
 
     @staticmethod
-    async def invalidate_refresh_token(jti: str) -> None:
+    async def invalidate_refresh_token(jti: str) -> bool:
         """Blacklist a refresh token by its jti claim."""
         try:
             redis = get_redis_client()
             ttl_seconds = settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
             await redis.set(f"revoked_token:{jti}", "1", ex=ttl_seconds)
+            return True
         except Exception as e:
             import logging
             logging.error(f"Redis error invalidating refresh token {jti}: {e}")
+            return False

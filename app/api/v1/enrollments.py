@@ -165,25 +165,48 @@ async def confirm_payment(
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
 
-    if payment.student_id != current_user.id:
+    if payment.student_id != current_user.id or payment.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
-    if payment.status == "completed":
+    if payment.payment_status == "completed":
         enrollment = await enrollment_repo.get_by_id(payment.enrollment_id)
         if enrollment:
             return _to_response(enrollment)
 
+    if payment.payment_status == "failed":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment has already failed")
+
     payment_status = "completed"
+    if payload.payment_method != payment.payment_method:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment method mismatch")
+
     if payload.payment_data:
-        if "vnp_SecureHash" in payload.payment_data:
+        if payment.payment_method == "vnpay" and "vnp_SecureHash" in payload.payment_data:
             vnpay = get_vnpay_service()
             verify_res = vnpay.verify_return(payload.payment_data)
-            if not verify_res.get("is_valid") or not verify_res.get("is_success"):
+            callback_transaction = verify_res.get("transaction_id")
+            callback_amount = int(verify_res.get("amount", 0))
+            if (
+                not verify_res.get("is_valid")
+                or not verify_res.get("is_success")
+                or callback_transaction != payment.transaction_id
+                or callback_amount != payment.amount_vnd
+            ):
                 payment_status = "failed"
-        elif "signature" in payload.payment_data:
+        elif payment.payment_method == "momo" and "signature" in payload.payment_data:
             momo = get_momo_service()
             verify_res = momo.verify_callback(payload.payment_data)
-            if not verify_res.get("is_valid") or not verify_res.get("is_success"):
+            callback_transaction = verify_res.get("order_id")
+            try:
+                callback_amount = int(verify_res.get("amount", 0))
+            except (TypeError, ValueError):
+                callback_amount = -1
+            if (
+                not verify_res.get("is_valid")
+                or not verify_res.get("is_success")
+                or callback_transaction != payment.transaction_id
+                or callback_amount != payment.amount_vnd
+            ):
                 payment_status = "failed"
         else:
             payment_status = "failed"

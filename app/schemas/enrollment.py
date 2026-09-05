@@ -19,9 +19,9 @@ class PaymentIntentResponse(BaseModel):
 
 
 class PaymentConfirmRequest(BaseModel):
-    transaction_id: str
-    payment_method: str
-    payment_data: dict | None = None
+    transaction_id: str = Field(min_length=1, max_length=255)
+    payment_method: str = Field(pattern="^(vnpay|momo)$")
+    payment_data: dict | None = Field(default=None, max_length=50)
 
 
 class EnrollmentResponse(BaseModel):

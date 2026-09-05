@@ -5,16 +5,20 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 
+from app.core.config import settings
+
 
 def _get_real_ip(request: Request) -> str:
-    """Get real client IP, supporting X-Forwarded-For behind reverse proxies."""
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+    """Use the proxy-normalized peer address; never trust a client-supplied XFF."""
     return request.client.host if request.client else "unknown"
 
 
-limiter = Limiter(key_func=_get_real_ip, default_limits=["100/minute"])
+limiter = Limiter(
+    key_func=_get_real_ip,
+    default_limits=["100/minute"],
+    storage_uri=settings.REDIS_URL,
+    in_memory_fallback_enabled=False,
+)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

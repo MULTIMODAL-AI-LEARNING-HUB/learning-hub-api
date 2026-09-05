@@ -52,8 +52,11 @@ async def get_enrollment_progress(
         course = await course_repo.get_by_id(enrollment.course_id)
         if not course or course.lecturer_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view progress for this course")
-    elif current_user.role != "admin" and enrollment.student_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    elif current_user.role != "admin":
+        if enrollment.student_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        if enrollment.status not in {"active", "completed"} or enrollment.payment_status != "paid":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active enrollment required")
 
     progress_repo = ProgressRepository(db)
     material_repo = CourseMaterialRepository(db)
@@ -93,7 +96,7 @@ async def update_material_progress(
     if enrollment.student_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
-    if enrollment.status != "active":
+    if enrollment.status not in {"active", "completed"} or enrollment.payment_status != "paid":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Enrollment is not active")
 
     material_repo = CourseMaterialRepository(db)

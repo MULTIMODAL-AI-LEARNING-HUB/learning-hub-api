@@ -27,6 +27,8 @@ class VNPayService:
         ip_address: str
     ) -> str:
         """Create VNPay payment URL."""
+        if not self.merchant_id or not self.hash_secret:
+            raise RuntimeError("VNPay is not configured")
         params = {
             "vnp_Version": "2.1.0",
             "vnp_Command": "pay",
@@ -45,14 +47,11 @@ class VNPayService:
         sorted_params = dict(sorted(params.items()))
         query_string = urllib.parse.urlencode(sorted_params)
 
-        if self.hash_secret:
-            hash_data = hmac.new(
-                self.hash_secret.encode(),
-                query_string.encode(),
-                hashlib.sha256
-            ).hexdigest()
-        else:
-            hash_data = ""
+        hash_data = hmac.new(
+            self.hash_secret.encode(),
+            query_string.encode(),
+            hashlib.sha256
+        ).hexdigest()
 
         payment_url = f"{self.vnp_url}?{query_string}&vnp_SecureHash={hash_data}"
         return payment_url
@@ -127,6 +126,9 @@ class MoMoService:
 
         import httpx
 
+        if not self.partner_code or not self.access_key or not self.secret_key:
+            raise RuntimeError("MoMo is not configured")
+
         request_id = str(uuid.uuid4())
         order_id = transaction_id
         request_type = "captureWallet"
@@ -174,8 +176,10 @@ class MoMoService:
                 raise ValueError(res_data.get("message") or "Failed to create MoMo payment")
         except Exception as e:
             logging.error(f"Failed to communicate with MoMo gateway: {e}")
-            # Fallback URL for test/local environments
-            return f"https://test-payment.momo.vn/v2/gateway/api/create?partnerCode={self.partner_code}&orderId={order_id}&amount={amount}"
+            if settings.DEBUG:
+                # Fallback URL is strictly limited to local/test environments.
+                return f"https://test-payment.momo.vn/v2/gateway/api/create?partnerCode={self.partner_code}&orderId={order_id}&amount={amount}"
+            raise RuntimeError("MoMo payment gateway unavailable") from e
 
     def verify_callback(self, params: dict) -> dict[str, Any]:
         """Verify MoMo callback parameters using constant-time digest comparison."""

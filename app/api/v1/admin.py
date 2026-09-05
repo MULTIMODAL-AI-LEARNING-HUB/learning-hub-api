@@ -388,11 +388,16 @@ async def _sync_active_keys_to_ai_service(db: AsyncSession):
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_ai_keys(
     request: Request,
+    provider: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
     """List all configured AI API keys with masked key values. Admin only."""
-    result = await db.execute(select(AiApiKey).order_by(AiApiKey.created_at.desc()))
+    query = select(AiApiKey)
+    if provider:
+        query = query.where(AiApiKey.provider == provider.lower().strip())
+    query = query.order_by(AiApiKey.created_at.desc())
+    result = await db.execute(query)
     keys = result.scalars().all()
     items = [
         AiApiKeyResponse(
@@ -408,6 +413,7 @@ async def list_ai_keys(
         for k in keys
     ]
     return AiApiKeyListResponse(items=items, total=len(items))
+
 
 
 @router.post("/ai-keys", response_model=AiApiKeyResponse, status_code=status.HTTP_201_CREATED)

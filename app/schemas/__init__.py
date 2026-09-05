@@ -83,6 +83,7 @@ __all__ = [
     "ForgotPasswordRequest",
     "GoogleLoginRequest",
     "LoginRequest",
+    "LogoutRequest",
     "MessageResponse",
     "RefreshRequest",
     "RegisterRequest",

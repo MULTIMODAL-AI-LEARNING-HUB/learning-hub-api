@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     QDRANT_URL: str | None = None
     QDRANT_API_KEY: str | None = None
 
-    MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin123"
+    MINIO_ENDPOINT: str = ""
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
     MINIO_BUCKET_NAME: str = "documents-bucket"
     MINIO_SECURE: bool = False
 
@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_ADMIN: str = "60/minute"
 
     SECRET_KEY: str = ""
+    AI_KEY_ENCRYPTION_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -165,6 +166,8 @@ class Settings(BaseSettings):
                 "INTERNAL_API_KEY must be a secure, non-default string (min 16 chars). "
                 "Generate one with: python -c \"import secrets; print(secrets.token_hex(16))\""
             )
+        if not self.DEBUG and not self.AI_KEY_ENCRYPTION_KEY:
+            raise ValueError("AI_KEY_ENCRYPTION_KEY must be configured separately in production")
 
         # Additional production-only checks
         if not self.DEBUG:

@@ -1,6 +1,7 @@
 """Redis cache helper module."""
 
 import json
+import ssl
 from typing import Any, Optional
 
 import redis.asyncio as aioredis
@@ -20,7 +21,7 @@ def get_redis_client() -> aioredis.Redis:
             "max_connections": 50,
         }
         if settings.REDIS_URL.startswith("rediss://"):
-            kwargs["ssl_cert_reqs"] = "none"
+            kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED
         _redis_client = aioredis.from_url(
             settings.REDIS_URL,
             **kwargs,

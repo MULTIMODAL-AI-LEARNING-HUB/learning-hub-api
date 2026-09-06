@@ -1,5 +1,6 @@
 import uuid
 from typing import List
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -9,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.clients.minio_client import MinioClient
 from app.core.cache import RedisCache
+from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_lecturer
 from app.dependencies.course_auth import (
@@ -31,6 +33,36 @@ from app.schemas.course_content import (
 from app.utils.upload import read_upload_file_safely, sanitize_filename
 
 router = APIRouter(prefix="/sections/{section_id}/lessons", tags=["Lessons"])
+
+
+async def _get_lesson_in_section(db: AsyncSession, section_id: UUID, lesson_id: UUID) -> Lesson:
+    """Resolve a lesson only when it belongs to the section in the URL."""
+    result = await db.execute(
+        select(Lesson).where(Lesson.id == lesson_id, Lesson.section_id == section_id)
+    )
+    lesson = result.scalar_one_or_none()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    return lesson
+
+
+def _validate_attachment_uri(file_url: str, course_id: UUID, lesson_id: UUID) -> str:
+    """Accept only object-storage URIs inside this course/lesson namespace."""
+    value = file_url.strip()
+    parsed = urlparse(value)
+    if parsed.scheme != "s3" or parsed.netloc != settings.MINIO_BUCKET_NAME:
+        raise HTTPException(status_code=400, detail="Attachments must use the configured private object storage")
+
+    key = parsed.path.lstrip("/")
+    if ".." in key.split("/") or "\\" in key:
+        raise HTTPException(status_code=400, detail="Invalid attachment storage key")
+    allowed_prefixes = (
+        f"materials/{course_id}/{lesson_id}/",
+        f"course_materials/{course_id}/",
+    )
+    if not key.startswith(allowed_prefixes):
+        raise HTTPException(status_code=400, detail="Attachment is outside the course storage namespace")
+    return value
 
 
 @router.get("", response_model=List[LessonResponse])
@@ -253,9 +285,7 @@ async def list_attachments(
     current_user: User = Depends(get_current_user)
 ):
     section, course = await get_section_with_course(db, section_id)
-    lesson = (await db.execute(select(Lesson).where(Lesson.id == lesson_id, Lesson.section_id == section_id))).scalar_one_or_none()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="Lesson not found")
+    lesson = await _get_lesson_in_section(db, section_id, lesson_id)
     await verify_lesson_access(lesson, course, current_user, db)
 
     result = await db.execute(
@@ -284,11 +314,13 @@ async def create_attachment(
 ):
     section, course = await get_section_with_course(db, section_id)
     await verify_course_ownership(course, current_user)
+    lesson = await _get_lesson_in_section(db, section_id, lesson_id)
+    clean_file_url = _validate_attachment_uri(attachment_data.file_url, course.id, lesson.id)
 
     attachment = Attachment(
         lesson_id=lesson_id,
-        file_name=attachment_data.file_name,
-        file_url=attachment_data.file_url,
+        file_name=sanitize_filename(attachment_data.file_name),
+        file_url=clean_file_url,
         file_type=attachment_data.file_type,
         file_size=attachment_data.file_size
     )
@@ -303,14 +335,14 @@ async def create_attachment(
         except Exception:
             pass
 
-    if attachment.file_type == "pdf" and attachment.file_url:
+    if attachment.file_type == "pdf":
         from app.tasks.lesson_tasks import dispatch_process_course_file
         dispatch_process_course_file(
-            storage_key=attachment.file_url,
+            storage_key=clean_file_url,
             course_id=str(course.id),
             lesson_id=str(lesson_id),
             source_type="lesson_attachment",
-            file_name=attachment_data.file_name,
+            file_name=attachment.file_name,
         )
 
     return attachment
@@ -326,6 +358,7 @@ async def upload_lesson_attachment(
 ):
     section, course = await get_section_with_course(db, section_id)
     await verify_course_ownership(course, current_user)
+    await _get_lesson_in_section(db, section_id, lesson_id)
 
     filename = sanitize_filename(file.filename)
     ext = filename.split(".")[-1].lower() if "." in filename else "bin"
@@ -345,7 +378,7 @@ async def upload_lesson_attachment(
 
     attachment = Attachment(
         lesson_id=lesson_id,
-        file_name=file.filename,
+        file_name=filename,
         file_url=storage_uri,
         file_type=file.content_type,
         file_size=len(content)
@@ -369,7 +402,7 @@ async def upload_lesson_attachment(
             course_id=str(course.id),
             lesson_id=str(lesson_id),
             source_type="lesson_attachment",
-            file_name=file.filename,
+            file_name=filename,
         )
 
     return attachment
@@ -385,6 +418,7 @@ async def delete_attachment(
 ):
     section, course = await get_section_with_course(db, section_id)
     await verify_course_ownership(course, current_user)
+    await _get_lesson_in_section(db, section_id, lesson_id)
 
     result = await db.execute(
         select(Attachment).where(Attachment.id == attachment_id, Attachment.lesson_id == lesson_id)

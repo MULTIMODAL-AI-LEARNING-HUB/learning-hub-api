@@ -15,9 +15,9 @@ class VNPayService:
 
     def __init__(self):
         self.vnp_url = settings.VNPAY_URL
-        self.merchant_id = settings.VNPAY_MERCHANT_ID
-        self.hash_secret = settings.VNPAY_HASH_SECRET
-        self.return_url = settings.VNPAY_RETURN_URL
+        self.merchant_id = settings.VNPAY_MERCHANT_ID or "DEMOV2"
+        self.hash_secret = settings.VNPAY_HASH_SECRET or "RAOARVACBPNIPJHAMJCJKHQKGSGIVFEK"
+        self.return_url = settings.VNPAY_RETURN_URL if settings.VNPAY_RETURN_URL and "localhost" not in settings.VNPAY_RETURN_URL else f"{settings.FRONTEND_URL}/payment/return"
 
     def create_payment_url(
         self,
@@ -109,10 +109,10 @@ class MoMoService:
 
     def __init__(self):
         self.momo_url = settings.MOMO_URL
-        self.partner_code = settings.MOMO_PARTNER_CODE
-        self.access_key = settings.MOMO_ACCESS_KEY
-        self.secret_key = settings.MOMO_SECRET_KEY
-        self.return_url = settings.MOMO_RETURN_URL
+        self.partner_code = settings.MOMO_PARTNER_CODE or "MOMO_DEMO"
+        self.access_key = settings.MOMO_ACCESS_KEY or "MOMO_ACCESS_KEY"
+        self.secret_key = settings.MOMO_SECRET_KEY or "MOMO_SECRET_KEY"
+        self.return_url = settings.MOMO_RETURN_URL if settings.MOMO_RETURN_URL and "localhost" not in settings.MOMO_RETURN_URL else f"{settings.FRONTEND_URL}/payment/return"
 
     async def create_payment_url(
         self,

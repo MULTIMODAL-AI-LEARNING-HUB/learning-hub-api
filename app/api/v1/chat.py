@@ -35,7 +35,7 @@ def _session_to_response(session: ChatSession) -> ChatSessionResponse:
     return ChatSessionResponse(
         id=session.id,
         course_id=session.course_id,
-        lesson_id=session.lesson_id,
+        lesson_id=getattr(session, "lesson_id", None),
         title=session.title,
         context_type=session.context_type,
         created_at=session.created_at,
@@ -47,7 +47,7 @@ def _session_to_list_item(session: ChatSession, last_message: str | None = None)
     return ChatSessionListItem(
         id=session.id,
         course_id=session.course_id,
-        lesson_id=session.lesson_id,
+        lesson_id=getattr(session, "lesson_id", None),
         title=session.title,
         context_type=session.context_type,
         updated_at=session.updated_at,
@@ -86,7 +86,6 @@ async def create_session(
     session = ChatSession(
         user_id=current_user.id,
         course_id=course_id,
-        lesson_id=payload.lesson_id,
         title=payload.title,
         context_type=payload.context_type,
     )

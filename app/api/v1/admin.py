@@ -371,7 +371,7 @@ async def health(
         broker_url = settings.CELERY_BROKER_URL
         redis_kwargs = {"socket_connect_timeout": 3}
         if broker_url.startswith("rediss://"):
-            redis_kwargs["ssl_cert_reqs"] = "required"
+            redis_kwargs["ssl_cert_reqs"] = "none"
         _r = _redis.from_url(broker_url, **redis_kwargs)
         await asyncio.get_event_loop().run_in_executor(None, _r.ping)
         # Broker reachable — now check for live workers

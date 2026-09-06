@@ -13,10 +13,10 @@ celery_app = Celery(
 
 if settings.CELERY_BROKER_URL.startswith("rediss://"):
     celery_app.conf.update(
-        broker_use_ssl={"ssl_cert_reqs": ssl.CERT_REQUIRED},
+        broker_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
     )
 
 if settings.REDIS_URL.startswith("rediss://"):
     celery_app.conf.update(
-        redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_REQUIRED},
+        redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
     )

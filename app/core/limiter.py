@@ -17,7 +17,7 @@ limiter = Limiter(
     key_func=_get_real_ip,
     default_limits=["100/minute"],
     storage_uri=settings.REDIS_URL,
-    in_memory_fallback_enabled=False,
+    in_memory_fallback_enabled=True,
 )
 
 

@@ -6,6 +6,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 REQUIRED_CORS_ORIGINS = {
     "https://learninghubs.tech",
     "https://www.learninghubs.tech",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
 }
 
 

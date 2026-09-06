@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -111,7 +111,7 @@ async def create_assignment(
         title=assignment_data.title,
         description=assignment_data.description,
         instructions=assignment_data.instructions,
-        deadline=assignment_data.deadline,
+        deadline=assignment_data.deadline.astimezone(timezone.utc).replace(tzinfo=None) if assignment_data.deadline and assignment_data.deadline.tzinfo else assignment_data.deadline,
         max_score=assignment_data.max_score,
         allow_resubmit=assignment_data.allow_resubmit,
         max_resubmits=assignment_data.max_resubmits
@@ -138,6 +138,8 @@ async def update_assignment(
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     for key, value in assignment_data.model_dump(exclude_unset=True).items():
+        if key == "deadline" and isinstance(value, datetime) and value.tzinfo:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
         setattr(assignment, key, value)
 
     await db.commit()
@@ -271,7 +273,8 @@ async def create_submission(
         raise HTTPException(status_code=400, detail="Maximum resubmits reached")
 
     is_late = False
-    if assignment.deadline and datetime.now() > assignment.deadline:
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    if assignment.deadline and now_utc > assignment.deadline:
         is_late = True
 
     normalized_attachments = []

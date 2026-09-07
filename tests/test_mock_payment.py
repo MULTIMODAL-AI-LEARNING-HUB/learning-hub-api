@@ -66,3 +66,37 @@ async def test_vnpay_and_momo_mock_url_fallback():
     assert "momo" in momo_url
     assert "token=" in momo_url
     assert "amount=300000" in momo_url
+
+
+@pytest.mark.asyncio
+async def test_enrollment_service_confirm_payment_with_kwargs():
+    """Verify confirm_payment accepts payment_status keyword argument properly."""
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+    from app.services.enrollment_service import EnrollmentService
+    from app.models.payment import Payment
+
+    enrollment_repo = MagicMock()
+    payment_repo = MagicMock()
+    course_repo = MagicMock()
+    service = EnrollmentService(enrollment_repo, payment_repo, course_repo)
+
+    txn = "mock_test_123"
+    fake_payment = Payment(
+        student_id=uuid4(),
+        course_id=uuid4(),
+        enrollment_id=uuid4(),
+        amount_vnd=199000,
+        payment_method="vnpay",
+        transaction_id=txn,
+        payment_status="pending",
+    )
+    payment_repo.get_by_transaction_id = AsyncMock(return_value=fake_payment)
+    payment_repo.update_status = AsyncMock(return_value=fake_payment)
+    enrollment_repo.update_payment = AsyncMock()
+    enrollment_repo.update_status = AsyncMock()
+    enrollment_repo.get_by_id = AsyncMock(return_value=None)
+
+    # Calling with payment_status keyword argument MUST succeed without TypeError
+    await service.confirm_payment(transaction_id=txn, payment_status="completed")
+    payment_repo.update_status.assert_awaited_once()

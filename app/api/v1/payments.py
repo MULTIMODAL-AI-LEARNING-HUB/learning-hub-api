@@ -136,7 +136,7 @@ async def confirm_mock_payment(
 
     enrollment, updated_payment = await enrollment_service.confirm_payment(
         transaction_id=payload.transaction_id,
-        status=target_status,
+        payment_status=target_status,
     )
 
     await RedisCache().delete(f"cache:enrollments:{current_user.id}")

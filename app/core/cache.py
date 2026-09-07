@@ -21,7 +21,7 @@ def get_redis_client() -> aioredis.Redis:
             "max_connections": 50,
         }
         if settings.REDIS_URL.startswith("rediss://"):
-            kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+            kwargs["ssl_cert_reqs"] = None
         _redis_client = aioredis.from_url(
             settings.REDIS_URL,
             **kwargs,

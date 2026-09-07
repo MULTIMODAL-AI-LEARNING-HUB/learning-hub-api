@@ -13,10 +13,18 @@ def _get_real_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _get_storage_uri() -> str:
+    uri = settings.REDIS_URL
+    if uri.startswith("rediss://") and "ssl_cert_reqs" not in uri:
+        sep = "&" if "?" in uri else "?"
+        return f"{uri}{sep}ssl_cert_reqs=none"
+    return uri
+
+
 limiter = Limiter(
     key_func=_get_real_ip,
     default_limits=["100/minute"],
-    storage_uri=settings.REDIS_URL,
+    storage_uri=_get_storage_uri(),
     # Never silently fall back to per-process limits; that multiplies the
     # effective brute-force/quota budget across workers.
     in_memory_fallback_enabled=False,

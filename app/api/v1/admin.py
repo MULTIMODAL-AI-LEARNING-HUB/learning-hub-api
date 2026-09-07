@@ -61,6 +61,16 @@ async def create_user(
         full_name=payload.full_name,
         role=payload.role,
     )
+    # Create default storage quota (mirrors register/oauth flows)
+    from app.models.quota import Quota
+    user.quota = Quota(
+        storage_limit_mb=1024,
+        storage_used_mb=0,
+        video_limit=5,
+        video_used=0,
+        token_limit=50000,
+        token_used=0,
+    )
     user = await repo.create(user)
     return AdminUserResponse(
         id=user.id,
@@ -350,7 +360,7 @@ async def health(
             mc.bucket_exists(settings.MINIO_BUCKET_NAME)
         services["s3_storage"] = "healthy"
     except Exception:
-        services["s3_storage"] = "healthy"
+        services["s3_storage"] = "unhealthy"
 
     # 5. Test Qdrant Vector Database
     try:
@@ -383,9 +393,10 @@ async def health(
                 asyncio.get_event_loop().run_in_executor(None, insp.ping),
                 timeout=5.0,
             )
-            services["celery"] = "healthy" if workers else "healthy"
+            services["celery"] = "healthy" if workers else "degraded"
         except Exception:
-            services["celery"] = "healthy"
+            # Broker reachable but no workers responded — broker healthy, workers unknown
+            services["celery"] = "degraded"
     except Exception:
         services["celery"] = "unhealthy"
 

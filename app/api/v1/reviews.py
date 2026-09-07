@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -115,7 +115,11 @@ async def create_review(
     )
     all_reviews = total_result.scalars().all()
     total_reviews = len(all_reviews) + 1
-    avg_rating = sum([r.rating for r in all_reviews]) / total_reviews if total_reviews > 0 else 0
+    # Include the new rating in the average (was missing → avg drifted low)
+    avg_rating = (
+        (sum(r.rating for r in all_reviews) + review_data.rating) / total_reviews
+        if total_reviews > 0 else 0
+    )
 
     course.rating_count = total_reviews
     course.rating_avg = round(avg_rating, 1)
@@ -203,6 +207,17 @@ async def update_my_review(
     for key, value in review_data.model_dump(exclude_unset=True).items():
         setattr(review, key, value)
 
+    # Recalculate course rating_avg/count after edit
+    all_reviews_result = await db.execute(
+        select(Review)
+        .join(Enrollment)
+        .where(Enrollment.course_id == course_id)
+    )
+    all_reviews = all_reviews_result.scalars().all()
+    if all_reviews:
+        course.rating_avg = round(sum(r.rating for r in all_reviews) / len(all_reviews), 1)
+        course.rating_count = len(all_reviews)
+
     await db.commit()
     await db.refresh(review)
 
@@ -242,7 +257,7 @@ async def lecturer_reply_review(
         raise HTTPException(status_code=404, detail="Review not found for this course")
 
     review.lecturer_reply = reply_data.reply
-    review.replied_at = datetime.now()
+    review.replied_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(review)

@@ -89,6 +89,11 @@ class EssaySubmitRequest(BaseModel):
     essay_text: str = Field(min_length=1, max_length=50000)
 
 
+class EssayJobResponse(BaseModel):
+    job_id: str
+    status: str = "processing"
+
+
 class EssayComparison(BaseModel):
     student_point: str
     source_match: str

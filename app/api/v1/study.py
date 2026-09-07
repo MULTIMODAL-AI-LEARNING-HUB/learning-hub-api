@@ -18,6 +18,7 @@ from app.models.flashcard import Flashcard
 from app.models.user import User
 from app.repositories.study_repo import StudyRepository
 from app.schemas.study import (
+    EssayJobResponse,
     EssayResponse,
     EssaySubmitRequest,
     FlashcardGenerateRequest,
@@ -200,15 +201,15 @@ async def get_flashcard(
     )
 
 
-@router.post("/essay/submit", response_model=EssayResponse)
+@router.post("/essay/submit", response_model=EssayJobResponse, status_code=202)
 @limiter.limit(settings.RATE_LIMIT_CHAT)
 async def submit_essay(
     request: Request,
     payload: EssaySubmitRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> EssayResponse:
-    """Submit essay and get automatic scoring using async AI Client."""
+) -> EssayJobResponse:
+    """Submit essay for async AI grading. Poll /essay/job/{job_id} for results."""
     from app.repositories.document_repo import DocumentRepository
     doc = await DocumentRepository(db).get_by_id(payload.document_id)
     if not doc or doc.user_id != current_user.id:
@@ -226,19 +227,51 @@ async def submit_essay(
     )
     submission = await repo.create_essay_submission(submission)
 
-    from app.clients.ai_client import AiClient
+    from app.tasks.essay_tasks import dispatch_grade_essay
 
-    try:
-        data = await AiClient().grade_essay(str(payload.document_id), payload.essay_text, str(current_user.id))
-    except Exception:
-        data = {"score": 0, "feedback": "AI service unavailable", "comparisons": []}
+    job_id = dispatch_grade_essay(
+        str(payload.document_id),
+        str(submission.id),
+        payload.essay_text,
+    )
+    await RedisCache().set(
+        f"cache:essay_job:{job_id}",
+        str(current_user.id),
+        ttl=3600,
+    )
+    return EssayJobResponse(job_id=job_id, status="processing")
 
+
+@router.get("/essay/job/{job_id}")
+async def get_essay_job(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Poll essay grading job status and retrieve results when ready."""
     from datetime import datetime, timezone
 
+    owner = await RedisCache().get(f"cache:essay_job:{job_id}")
+    if owner is None or str(owner) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Essay job not found")
+
+    from app.tasks.essay_tasks import get_essay_job_status
+
+    job = get_essay_job_status(job_id)
+
+    if job["status"] == "processing":
+        return EssayJobResponse(job_id=job_id, status="processing")
+
+    if job["status"] == "failed":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Essay grading failed",
+        )
+
     return EssayResponse(
-        submission_id=submission.id,
-        score=data.get("score", 0),
-        feedback=data.get("feedback", ""),
-        comparisons=data.get("comparisons", []),
+        submission_id=job_id,
+        score=job.get("score", 0),
+        feedback=job.get("feedback", ""),
+        comparisons=job.get("comparisons", []),
         graded_at=datetime.now(timezone.utc),
     )

@@ -269,7 +269,10 @@ async def create_submission(
     if not assignment.allow_resubmit and len(existing_submissions) > 0:
         raise HTTPException(status_code=400, detail="Resubmission not allowed")
 
-    if len(existing_submissions) >= assignment.max_resubmits:
+    # max_resubmits = max ADDITIONAL submissions after the first one.
+    # First submission (len==0) is always allowed; max_resubmits=0 blocks
+    # everything after the first, >0 allows that many extra tries.
+    if len(existing_submissions) > assignment.max_resubmits:
         raise HTTPException(status_code=400, detail="Maximum resubmits reached")
 
     is_late = False
@@ -434,7 +437,7 @@ async def grade_submission(
 
     submission.score = grade_data.score
     submission.feedback = grade_data.feedback
-    submission.graded_at = datetime.now()
+    submission.graded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.commit()
     await db.refresh(submission)

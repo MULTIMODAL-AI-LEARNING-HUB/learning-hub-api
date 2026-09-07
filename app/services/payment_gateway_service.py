@@ -10,6 +10,21 @@ from typing import Any
 from app.core.config import settings
 
 
+
+def generate_mock_payment_token(transaction_id: str, amount: int) -> str:
+    """Generate tamper-proof HMAC token for simulated mock payments."""
+    raw = f"mock:{transaction_id}:{amount}"
+    return hmac.new(settings.SECRET_KEY.encode(), raw.encode(), hashlib.sha256).hexdigest()
+
+
+def verify_mock_payment_token(transaction_id: str, amount: int, token: str) -> bool:
+    """Verify HMAC token for simulated mock payments using constant-time comparison."""
+    if not token or not settings.SECRET_KEY:
+        return False
+    expected = generate_mock_payment_token(transaction_id, amount)
+    return hmac.compare_digest(str(token).lower(), str(expected).lower())
+
+
 class VNPayService:
     """VNPay payment gateway service."""
 
@@ -28,6 +43,16 @@ class VNPayService:
     ) -> str:
         """Create VNPay payment URL."""
         if not self.merchant_id or not self.hash_secret:
+            if settings.ENABLE_MOCK_PAYMENT:
+                token = generate_mock_payment_token(transaction_id, amount)
+                query = urllib.parse.urlencode({
+                    "method": "vnpay",
+                    "transaction_id": transaction_id,
+                    "amount": str(amount),
+                    "order_info": order_info,
+                    "token": token,
+                })
+                return f"{settings.FRONTEND_URL}/payment/mock-gateway?{query}"
             raise RuntimeError("VNPay is not configured")
         params = {
             "vnp_Version": "2.1.0",
@@ -127,6 +152,16 @@ class MoMoService:
         import httpx
 
         if not self.partner_code or not self.access_key or not self.secret_key:
+            if settings.ENABLE_MOCK_PAYMENT:
+                token = generate_mock_payment_token(transaction_id, amount)
+                query = urllib.parse.urlencode({
+                    "method": "momo",
+                    "transaction_id": transaction_id,
+                    "amount": str(amount),
+                    "order_info": order_info,
+                    "token": token,
+                })
+                return f"{settings.FRONTEND_URL}/payment/mock-gateway?{query}"
             raise RuntimeError("MoMo is not configured")
 
         request_id = str(uuid.uuid4())

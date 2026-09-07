@@ -137,6 +137,7 @@ class Settings(BaseSettings):
     MOMO_ACCESS_KEY: str = ""
     MOMO_SECRET_KEY: str = ""
     MOMO_RETURN_URL: str = "http://localhost:5173/payment/return"
+    ENABLE_MOCK_PAYMENT: bool = True
 
     @model_validator(mode="after")
     def validate_secrets(self) -> "Settings":

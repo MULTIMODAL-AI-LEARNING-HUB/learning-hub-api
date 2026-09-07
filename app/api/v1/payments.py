@@ -33,6 +33,7 @@ class PaymentStatusResponse(BaseModel):
     enrollment_id: str | None = None
     transaction_id: str | None = None
     amount_vnd: int | None = None
+    course_id: str | None = None
 
 
 class MockPaymentConfirmResponse(BaseModel):
@@ -82,6 +83,7 @@ async def get_payment_status(
         enrollment_id=str(payment.enrollment_id) if payment.enrollment_id else None,
         transaction_id=payment.transaction_id,
         amount_vnd=payment.amount_vnd,
+        course_id=str(payment.course_id) if payment.course_id else None,
     )
 
 

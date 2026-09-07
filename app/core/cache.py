@@ -1,7 +1,6 @@
 """Redis cache helper module."""
 
 import json
-import ssl
 from typing import Any, Optional
 
 import redis.asyncio as aioredis

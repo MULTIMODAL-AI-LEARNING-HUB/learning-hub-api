@@ -157,7 +157,10 @@ class AuthService:
                     if resp.status_code == 200:
                         data = resp.json()
                         email = data.get("email")
-                        if not data.get("verified_email", False):
+                        is_verified = data.get("email_verified")
+                        if is_verified is None:
+                            is_verified = data.get("verified_email", True)
+                        if not is_verified:
                             email = None
                         google_id = data.get("sub")
                         full_name = data.get("name")

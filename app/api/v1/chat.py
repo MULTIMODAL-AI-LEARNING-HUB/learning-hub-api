@@ -168,11 +168,12 @@ async def ask(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
     course_id = payload.course_id or session.course_id
-    lesson_id = payload.lesson_id or session.lesson_id
+    session_lesson_id = getattr(session, "lesson_id", None)
+    lesson_id = payload.lesson_id or session_lesson_id
 
     if session.course_id and course_id and session.course_id != course_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session course cannot be changed")
-    if session.lesson_id and lesson_id and session.lesson_id != lesson_id:
+    if session_lesson_id and lesson_id and session_lesson_id != lesson_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session lesson cannot be changed")
 
     if course_id:

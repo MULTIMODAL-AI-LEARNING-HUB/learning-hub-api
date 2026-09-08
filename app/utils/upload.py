@@ -74,6 +74,8 @@ def validate_file_magic_bytes(content: bytes, ext: str) -> bool:
         return content.startswith(b"\x1a\x45\xdf\xa3")
     if normalized_ext == "mp3":
         return content.startswith(b"ID3") or (len(content) >= 2 and content[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"))
+    if normalized_ext == "wav":
+        return content.startswith(b"RIFF") and len(content) >= 12 and content[8:12] == b"WAVE"
     if normalized_ext in ("zip", "docx"):
         return content.startswith(b"PK\x03\x04")
     if normalized_ext == "doc":

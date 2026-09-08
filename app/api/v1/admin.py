@@ -339,7 +339,7 @@ async def health(
     # 2. Test AI Service Connection (Async HTTP)
     try:
         client = get_ai_client()
-        resp = await client.get("/health", timeout=5)
+        resp = await client.get("/health", timeout=10)
         services["ai_service"] = "healthy" if resp.status_code == 200 else "unhealthy"
     except Exception:
         services["ai_service"] = "unhealthy"
@@ -380,9 +380,10 @@ async def health(
     try:
         import redis as _redis
         broker_url = settings.CELERY_BROKER_URL
-        redis_kwargs = {"socket_connect_timeout": 3}
+        redis_kwargs = {"socket_connect_timeout": 5}
         if broker_url.startswith("rediss://"):
-            redis_kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+            # Heroku Data for Redis uses self-signed certs
+            redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
         _r = _redis.from_url(broker_url, **redis_kwargs)
         await asyncio.get_event_loop().run_in_executor(None, _r.ping)
         # Broker reachable — now check for live workers

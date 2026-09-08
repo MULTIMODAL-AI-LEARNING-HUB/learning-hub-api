@@ -67,14 +67,14 @@ async def upload(
     current_user: User = Depends(get_current_user),
 ) -> DocumentUploadResponse:
     """Upload a document to MinIO and trigger processing worker."""
-    # 1. Extension & Format validation
+    # 1. Extension & Format validation (aligned with worker-supported formats)
     filename = sanitize_filename(file.filename)
     ext = filename.split(".")[-1].lower() if "." in filename else ""
-    allowed_exts = {"pdf", "mp4", "mp3", "webm"}
+    allowed_exts = {"pdf", "mp4", "mp3", "webm", "wav", "txt", "doc", "docx"}
     if ext not in allowed_exts:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file format: .{ext}. Allowed: PDF, MP4, MP3, WebM."
+            detail=f"Unsupported file format: .{ext}. Allowed: PDF, MP4, MP3, WebM, WAV, TXT, DOC, DOCX."
         )
 
     # 2. File size calculation & Quota validation (100MB hard limit per file)

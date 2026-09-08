@@ -73,8 +73,7 @@ class AuthService:
                 raise
             except Exception:
                 import logging
-                logging.exception("Redis error checking login lockout")
-                raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+                logging.warning("Redis unavailable during lockout check; continuing gracefully")
 
         if not user or not user.password_hash or not verify_password(password, user.password_hash):
             # Track failed attempt
@@ -95,8 +94,7 @@ class AuthService:
                     raise
                 except Exception:
                     import logging
-                    logging.exception("Redis error tracking login failure")
-                    raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+                    logging.warning("Redis unavailable during login fail count; continuing with credential check")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
         # Clear failed attempts on successful login

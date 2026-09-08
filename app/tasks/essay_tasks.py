@@ -1,7 +1,6 @@
 """Task dispatch helpers for essay grading."""
 
 from celery.result import AsyncResult
-from fastapi import HTTPException, status
 
 from app.core.celery import celery_app
 

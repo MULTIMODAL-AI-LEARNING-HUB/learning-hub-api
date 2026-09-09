@@ -198,6 +198,37 @@ async def get_document(
     return _to_response(doc)
 
 
+@router.post("/{doc_id}/retry", response_model=DocumentResponse)
+async def retry_document(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentResponse:
+    """Re-queue a failed (or stuck processing) document for worker processing.
+
+    Frontend 'Thử lại' previously only flipped local UI state without
+    re-dispatching the Celery task, so retry never actually reprocessed.
+    This endpoint resets status to processing, clears the previous error,
+    invalidates the list cache, and dispatches a new worker task.
+    """
+    repo = DocumentRepository(db)
+    doc = await repo.get_by_id(doc_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    if doc.status not in ("failed", "processing"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only failed or processing documents can be retried (current: {doc.status}).",
+        )
+    doc.status = "processing"
+    doc.file_metadata = None
+    await db.commit()
+    await db.refresh(doc)
+    await RedisCache().delete_pattern(f"cache:docs:{current_user.id}:*")
+    dispatch_process_document(str(doc.id))
+    return _to_response(doc)
+
+
 @router.delete("/{doc_id}", status_code=204)
 async def delete_document(
     doc_id: UUID,

@@ -115,7 +115,11 @@ class Settings(BaseSettings):
         return v
 
     AI_SERVICE_URL: str = "http://localhost:8001"
-    AI_SERVICE_TIMEOUT: float = 30.0
+    # RAG pipeline (intent 10s + retriever 60s cold-start + grader 15s +
+    # generator 60s + reflector 30s + retry 60s) can exceed 2 minutes worst
+    # case; warm path is usually <20s. 150s covers both without the
+    # gateway giving up before the AI service finishes.
+    AI_SERVICE_TIMEOUT: float = 150.0
     INTERNAL_API_KEY: str = ""
 
     SMTP_HOST: str = "localhost"

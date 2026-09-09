@@ -38,12 +38,19 @@ class AiClient:
         self.client = get_ai_client()
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(2),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True
     )
     async def ask(self, payload: dict) -> dict[str, Any]:
-        """Send chat query to AI service."""
+        """Send chat query to AI service.
+
+        NOTE: no per-request timeout override — the shared client already uses
+        settings.AI_SERVICE_TIMEOUT (150s, covering the worst-case RAG chain).
+        Retries are limited to 2 attempts: a retry after a ~2min RAG run would
+        triple user-visible latency and risk hitting Heroku's 30s router limit.
+        Transient failures still retry once; the FE stream fallback can recover.
+        """
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
         response = await self.client.post("/chat/ask", json=payload, headers=headers)
         response.raise_for_status()

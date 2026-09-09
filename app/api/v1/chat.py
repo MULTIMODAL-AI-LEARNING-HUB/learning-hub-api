@@ -323,7 +323,7 @@ async def ask_stream(
         full_answer = ""
         citations = []
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
+            async with httpx.AsyncClient(timeout=float(settings.AI_SERVICE_TIMEOUT)) as client:
                 async with client.stream(
                     "POST",
                     f"{settings.AI_SERVICE_URL}/chat/ask/stream",

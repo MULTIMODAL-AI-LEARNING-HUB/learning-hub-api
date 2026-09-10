@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from app.core.database import engine
 
-HEAD_REVISION = "d3e4f5a6b7c8"
+HEAD_REVISION = "f5a6b7c8d9e0"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(message)s")
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,31 @@ DDL_STATEMENTS = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_ai_api_keys_provider ON ai_api_keys (provider)",
     "CREATE INDEX IF NOT EXISTS ix_ai_api_keys_is_active ON ai_api_keys (is_active)",
+    """
+    CREATE TABLE IF NOT EXISTS quiz_sets (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        document_id UUID NULL REFERENCES documents(id) ON DELETE SET NULL,
+        job_id VARCHAR(64) NULL,
+        quiz_type VARCHAR(20) NOT NULL DEFAULT 'quick',
+        question_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_quiz_sets_user_id ON quiz_sets (user_id)",
+    "CREATE INDEX IF NOT EXISTS ix_quiz_sets_document_id ON quiz_sets (document_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_quiz_sets_job_id ON quiz_sets (job_id)",
+    """
+    CREATE TABLE IF NOT EXISTS quiz_questions (
+        id UUID PRIMARY KEY,
+        quiz_set_id UUID NOT NULL REFERENCES quiz_sets(id) ON DELETE CASCADE,
+        question_text TEXT NOT NULL,
+        options JSONB NOT NULL DEFAULT '[]',
+        correct_answer VARCHAR(10) NOT NULL DEFAULT '',
+        position INTEGER NOT NULL DEFAULT 0
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_quiz_questions_quiz_set_id ON quiz_questions (quiz_set_id)",
     "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)",
     "DELETE FROM alembic_version",
     f"INSERT INTO alembic_version (version_num) VALUES ('{HEAD_REVISION}')",

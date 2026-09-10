@@ -339,37 +339,6 @@ async def generate_flashcards(
     )
 
 
-@router.get("/flashcards/sets/{flashcard_id}", response_model=FlashcardResponse)
-@router.get("/flashcards/{flashcard_id}", response_model=FlashcardResponse)
-async def get_flashcard(
-    flashcard_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> FlashcardResponse:
-    """Get flashcards and eager loaded items."""
-    repo = StudyRepository(db)
-    flashcard = await repo.get_flashcard(flashcard_id)
-    if not flashcard or flashcard.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard set not found")
-
-    items = [
-        FlashcardItemResponse(
-            id=item.id,
-            front=item.front_text,
-            back=item.back_text,
-            last_reviewed=item.last_reviewed,
-        )
-        for item in flashcard.items
-    ]
-    return FlashcardResponse(
-        id=flashcard.id,
-        set_name=flashcard.set_name,
-        document_id=flashcard.document_id,
-        items=items,
-        created_at=flashcard.created_at,
-    )
-
-
 @router.get("/flashcards", response_model=FlashcardHistoryListResponse)
 @router.get("/flashcards/history", response_model=FlashcardHistoryListResponse)
 async def list_flashcards_history(
@@ -396,6 +365,37 @@ async def list_flashcards_history(
             for fc, count in rows
         ],
         total=total,
+    )
+
+
+@router.get("/flashcards/sets/{flashcard_id}", response_model=FlashcardResponse)
+@router.get("/flashcards/{flashcard_id}", response_model=FlashcardResponse)
+async def get_flashcard(
+    flashcard_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FlashcardResponse:
+    """Get flashcards and eager loaded items (defined after list routes so /history is not swallowed)."""
+    repo = StudyRepository(db)
+    flashcard = await repo.get_flashcard(flashcard_id)
+    if not flashcard or flashcard.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard set not found")
+
+    items = [
+        FlashcardItemResponse(
+            id=item.id,
+            front=item.front_text,
+            back=item.back_text,
+            last_reviewed=item.last_reviewed,
+        )
+        for item in flashcard.items
+    ]
+    return FlashcardResponse(
+        id=flashcard.id,
+        set_name=flashcard.set_name,
+        document_id=flashcard.document_id,
+        items=items,
+        created_at=flashcard.created_at,
     )
 
 

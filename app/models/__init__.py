@@ -26,6 +26,7 @@ from app.models.material_progress import MaterialProgress
 from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.quota import Quota
+from app.models.quiz_set import QuizQuestion, QuizSet
 from app.models.social_chat import SocialChatMember, SocialChatMessage, SocialChatRoom
 from app.models.user import User
 from app.models.wishlist import WishlistItem
@@ -39,6 +40,8 @@ __all__ = [
     "FlashcardItem",
     "EssaySubmission",
     "Quota",
+    "QuizSet",
+    "QuizQuestion",
     "Category",
     "Course",
     "CourseMaterial",

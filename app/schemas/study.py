@@ -63,6 +63,47 @@ class QuizResultResponse(BaseModel):
     results: list[QuizResultItem]
 
 
+class QuizHistoryItem(BaseModel):
+    id: UUID
+    document_id: UUID | None = None
+    quiz_type: str
+    question_count: int
+    created_at: datetime
+
+
+class QuizHistoryListResponse(BaseModel):
+    items: list[QuizHistoryItem]
+    total: int
+
+
+class QuizPersistedQuestion(BaseModel):
+    id: UUID
+    question: str
+    options: list[str]
+    correct_answer: str
+
+
+class QuizDetailResponse(BaseModel):
+    id: UUID
+    document_id: UUID | None = None
+    quiz_type: str
+    questions: list[QuizPersistedQuestion]
+    created_at: datetime
+
+
+class FlashcardHistoryItem(BaseModel):
+    id: UUID
+    document_id: UUID | None = None
+    set_name: str | None = None
+    item_count: int = 0
+    created_at: datetime
+
+
+class FlashcardHistoryListResponse(BaseModel):
+    items: list[FlashcardHistoryItem]
+    total: int
+
+
 class FlashcardGenerateRequest(BaseModel):
     document_id: UUID
     set_name: str = Field(max_length=255)

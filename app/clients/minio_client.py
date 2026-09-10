@@ -87,6 +87,28 @@ class MinioClient:
         if file_path.exists():
             file_path.unlink()
 
+    def get_file_bytes(self, key: str) -> bytes | None:
+        """Download file content (bytes) from MinIO or local storage."""
+        clean_key = key.replace(f"s3://{self.bucket}/", "").replace("file://", "")
+        if self.client:
+            try:
+                response = self.client.get_object(self.bucket, clean_key)
+                try:
+                    return response.read()
+                finally:
+                    response.close()
+                    response.release_conn()
+            except Exception as e:
+                logger.warning("MinIO get_object failed: %s", e)
+
+        file_path = LOCAL_STORAGE_DIR / clean_key
+        if file_path.is_file():
+            try:
+                return file_path.read_bytes()
+            except Exception as e:
+                logger.warning("Local read_bytes failed: %s", e)
+        return None
+
     def get_presigned_url(self, key: str, expires_seconds: int = 3600) -> str:
         """Generate a presigned GET URL for an object or local download route."""
         clean_key = key.replace(f"s3://{self.bucket}/", "").replace("file://", "")

@@ -87,8 +87,13 @@ app.add_middleware(
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
+    is_viewer_content = request.url.path.startswith("/api/v1/documents/") and (
+        request.url.path.endswith("/content") or "/raw/" in request.url.path
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    # Allow the SPA to embed same-origin document bytes in <iframe>;
+    # default DENY would block every inline PDF preview.
+    response.headers["X-Frame-Options"] = "SAMEORIGIN" if is_viewer_content else "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"

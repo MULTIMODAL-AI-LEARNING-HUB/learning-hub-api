@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.essay import EssaySubmission
     from app.models.flashcard import Flashcard
     from app.models.notification import Notification
+    from app.models.quiz_set import QuizSet
     from app.models.quota import Quota
 
 class User(Base):
@@ -41,6 +42,7 @@ class User(Base):
     documents: Mapped[list["Document"]] = relationship(back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     chat_sessions: Mapped[list["ChatSession"]] = relationship(back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    quiz_sets: Mapped[list["QuizSet"]] = relationship(back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     essay_submissions: Mapped[list["EssaySubmission"]] = relationship(back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     quota: Mapped["Quota"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True)
     courses: Mapped[list["Course"]] = relationship(back_populates="lecturer", cascade="all, delete-orphan", passive_deletes=True)

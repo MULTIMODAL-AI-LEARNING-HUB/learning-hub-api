@@ -11,6 +11,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.essay import EssaySubmission
     from app.models.flashcard import Flashcard
+    from app.models.quiz_set import QuizSet
     from app.models.user import User
 
 class Document(Base):
@@ -31,4 +32,5 @@ class Document(Base):
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents")
     flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="document")
+    quiz_sets: Mapped[list["QuizSet"]] = relationship(back_populates="document")
     essay_submissions: Mapped[list["EssaySubmission"]] = relationship(back_populates="document")

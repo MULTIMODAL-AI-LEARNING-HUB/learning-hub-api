@@ -4,7 +4,7 @@ import logging
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,7 @@ from app.core.config import settings
 
 # Core/Client integrations
 from app.core.limiter import limiter
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, get_current_user_flexible
 from app.dependencies.course_auth import verify_course_access
 from app.dependencies.db import get_db
 from app.models.course import Course
@@ -36,14 +36,24 @@ from app.utils.upload import (
 router = APIRouter()
 
 
+_INLINE_CONTENT_TYPES = {
+    "pdf": "application/pdf",
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "txt": "text/plain; charset=utf-8",
+}
+
+
+def _content_url_for(doc: Document) -> str:
+    """Same-origin viewer URL for a document (avoids CORS/expired presigned issues)."""
+    return f"/api/v1/documents/{doc.id}/content"
+
+
 def _to_response(doc: Document) -> DocumentResponse:
-    """Helper to format Document model to schema, generating presigned MinIO URLs if stored."""
-    file_url = doc.file_url
-    if doc.storage_key:
-        try:
-            file_url = MinioClient().get_presigned_url(doc.storage_key)
-        except Exception:
-            pass  # Fall back to raw file_url if MinIO is not reachable
+    """Helper to format Document model to schema, exposing same-origin viewer URL."""
+    file_url = _content_url_for(doc)
             
     return DocumentResponse(
         id=doc.id,
@@ -196,6 +206,68 @@ async def get_document(
     if not doc or doc.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     return _to_response(doc)
+
+
+@router.get("/{doc_id}/content")
+@limiter.limit("60/minute")
+async def get_document_content(
+    request: Request,
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_flexible),
+):
+    """Stream the stored document bytes inline for the in-app viewer.
+
+    Same-origin endpoint so <iframe>/<video>/<audio> can render without
+    CORS or expired presigned-URL failures. Supports HTTP Range requests
+    so large PDFs and media files seek efficiently.
+    """
+    repo = DocumentRepository(db)
+    doc = await repo.get_by_id(doc_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    storage_key = doc.storage_key or ""
+    content = MinioClient().get_file_bytes(storage_key) if storage_key else None
+    if content is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found in storage")
+
+    ext = (doc.file_type or "").lower()
+    media_type = _INLINE_CONTENT_TYPES.get(ext, "application/octet-stream")
+
+    total = len(content)
+    range_header = request.headers.get("range")
+    if range_header and total:
+        try:
+            units, _, byte_range = range_header.partition("=")
+            if units.strip().lower() == "bytes":
+                start_s, _, end_s = byte_range.partition("-")
+                start = int(start_s) if start_s.strip() else 0
+                end = int(end_s) if end_s.strip() else total - 1
+                start = max(0, min(start, total - 1))
+                end = max(start, min(end, total - 1))
+                chunk = content[start:end + 1]
+                return Response(
+                    content=chunk,
+                    status_code=206,
+                    media_type=media_type,
+                    headers={
+                        "Content-Range": f"bytes {start}-{end}/{total}",
+                        "Accept-Ranges": "bytes",
+                        "Content-Length": str(len(chunk)),
+                    },
+                )
+        except (ValueError, IndexError):
+            pass
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(total),
+        },
+    )
 
 
 @router.post("/{doc_id}/retry", response_model=DocumentResponse)

@@ -25,6 +25,7 @@ from app.models import (
     Assignment,
     AssignmentSubmission,
     Enrollment,
+    Notification,
 )
 from app.models.user import User
 from app.schemas.course_content import (
@@ -306,6 +307,18 @@ async def create_submission(
         is_late=is_late
     )
     db.add(submission)
+
+    # Notify lecturer that a new submission was submitted
+    if course.lecturer_id and course.lecturer_id != current_user.id:
+        db.add(Notification(
+            user_id=course.lecturer_id,
+            title=f"Bài nộp mới: {lesson.title}",
+            detail=f"Học viên {current_user.full_name or 'Học viên'} vừa nộp bài tập trong khóa '{course.title}'.",
+            type="assignment",
+            related_id=course.id,
+            related_type="course",
+        ))
+
     await db.commit()
     await db.refresh(submission)
 
@@ -438,6 +451,17 @@ async def grade_submission(
     submission.score = grade_data.score
     submission.feedback = grade_data.feedback
     submission.graded_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Notify student that assignment has been graded
+    if submission.student_id and submission.student_id != current_user.id:
+        db.add(Notification(
+            user_id=submission.student_id,
+            title=f"Bài tập đã được chấm: {lesson.title}",
+            detail=f"Bài tập của bạn trong khóa '{course.title}' đã được chấm: {grade_data.score if grade_data.score is not None else '—'} điểm.",
+            type="grade",
+            related_id=course.id,
+            related_type="course",
+        ))
 
     await db.commit()
     await db.refresh(submission)

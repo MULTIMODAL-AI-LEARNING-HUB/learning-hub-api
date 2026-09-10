@@ -26,6 +26,19 @@ async def list_notifications(
     total_result = await db.execute(total_query)
     total = total_result.scalar() or 0
 
+    # Auto-seed a welcome notification if user has no notifications yet
+    if total == 0:
+        welcome_notif = Notification(
+            user_id=current_user.id,
+            title="Chào mừng bạn đến với MULTIMODAL AI LEARNING HUB!",
+            detail="Hệ thống thông báo đã sẵn sàng. Bạn sẽ nhận được các thông báo cập nhật về khóa học, bài tập, thảo luận và nhắc nhở học tập tại đây.",
+            type="welcome",
+            is_read=False,
+        )
+        db.add(welcome_notif)
+        await db.commit()
+        total = 1
+
     unread_query = select(func.count(Notification.id)).where(
         Notification.user_id == current_user.id,
         Notification.is_read.is_(False)
@@ -48,6 +61,25 @@ async def list_notifications(
         total=total,
         unread_count=unread_count,
     )
+
+
+@router.post("/send-test", response_model=NotificationResponse)
+async def send_test_notification(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a sample test notification for current user."""
+    notification = Notification(
+        user_id=current_user.id,
+        title="Thông báo thử nghiệm hệ thống",
+        detail="Tính năng thông báo đang hoạt động tốt. Khi bạn bấm vào đây hoặc đánh dấu đã đọc, biểu tượng chuông sẽ không còn báo đỏ nữa.",
+        type="test",
+        is_read=False,
+    )
+    db.add(notification)
+    await db.commit()
+    await db.refresh(notification)
+    return NotificationResponse.model_validate(notification)
 
 
 @router.put("/{notification_id}/read", response_model=NotificationResponse)

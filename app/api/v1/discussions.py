@@ -10,7 +10,7 @@ from app.core.cache import RedisCache
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.dependencies.course_auth import get_lesson_with_course, verify_lesson_access
-from app.models import Discussion
+from app.models import Discussion, Notification
 from app.models.user import User
 from app.schemas.course_content import (
     DiscussionCreate,
@@ -133,6 +133,30 @@ async def create_discussion(
         content=discussion_data.content
     )
     db.add(discussion)
+
+    if discussion_data.parent_id:
+        parent_author = (await db.execute(
+            select(Discussion.user_id).where(Discussion.id == discussion_data.parent_id)
+        )).scalar_one_or_none()
+        if parent_author and parent_author != current_user.id:
+            db.add(Notification(
+                user_id=parent_author,
+                title=f"Phản hồi mới trong bài '{lesson.title}'",
+                detail=f"{current_user.full_name or 'Một người dùng'} đã phản hồi thảo luận của bạn trong khóa '{course.title}'.",
+                type="discussion",
+                related_id=course.id,
+                related_type="course",
+            ))
+    elif course.lecturer_id and course.lecturer_id != current_user.id:
+        db.add(Notification(
+            user_id=course.lecturer_id,
+            title=f"Thảo luận mới: {lesson.title}",
+            detail=f"{current_user.full_name or 'Học viên'} đã đặt câu hỏi trong khóa '{course.title}'.",
+            type="discussion",
+            related_id=course.id,
+            related_type="course",
+        ))
+
     await db.commit()
     await db.refresh(discussion)
 

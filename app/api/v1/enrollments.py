@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.enrollment import Enrollment
+from app.models.notification import Notification
 from app.models.user import User
 from app.repositories.course_repo import CourseRepository
 from app.repositories.enrollment_repo import EnrollmentRepository
@@ -104,6 +105,24 @@ async def create_payment_intent(
         )
         await enrollment_service.confirm_payment(transaction_id, "completed")
         await RedisCache().delete(f"cache:enrollments:{current_user.id}")
+        db.add(Notification(
+            user_id=current_user.id,
+            title=f"Đăng ký thành công: {course.title}",
+            detail=f"Bạn đã đăng ký thành công khóa học '{course.title}'. Hãy bắt đầu học ngay!",
+            type="enrollment",
+            related_id=course_id,
+            related_type="course",
+        ))
+        if course.lecturer_id and course.lecturer_id != current_user.id:
+            db.add(Notification(
+                user_id=course.lecturer_id,
+                title=f"Học viên mới: {course.title}",
+                detail=f"Học viên {current_user.full_name or current_user.email} vừa đăng ký khóa '{course.title}'.",
+                type="enrollment",
+                related_id=course_id,
+                related_type="course",
+            ))
+        await db.commit()
         return PaymentIntentResponse(
             payment_url="",
             transaction_id=transaction_id,
@@ -227,6 +246,26 @@ async def confirm_payment(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment confirmation failed")
 
     await RedisCache().delete(f"cache:enrollments:{current_user.id}")
+    course = await course_repo.get_by_id(course_id)
+    if course:
+        db.add(Notification(
+            user_id=current_user.id,
+            title=f"Đăng ký thành công: {course.title}",
+            detail=f"Thanh toán thành công. Bạn đã đăng ký khóa học '{course.title}'. Hãy bắt đầu học ngay!",
+            type="enrollment",
+            related_id=course_id,
+            related_type="course",
+        ))
+        if course.lecturer_id and course.lecturer_id != current_user.id:
+            db.add(Notification(
+                user_id=course.lecturer_id,
+                title=f"Học viên mới: {course.title}",
+                detail=f"Học viên {current_user.full_name or current_user.email} vừa đăng ký khóa '{course.title}'.",
+                type="enrollment",
+                related_id=course_id,
+                related_type="course",
+            ))
+        await db.commit()
     return _to_response(enrollment)
 
 

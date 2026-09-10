@@ -13,7 +13,7 @@ from app.dependencies.auth import (
     require_lecturer,
 )
 from app.dependencies.course_auth import get_course_or_404, verify_course_ownership
-from app.models import Enrollment, Review
+from app.models import Enrollment, Notification, Review
 from app.models.user import User
 from app.schemas.course_content import (
     LecturerReply,
@@ -123,6 +123,17 @@ async def create_review(
 
     course.rating_count = total_reviews
     course.rating_avg = round(avg_rating, 1)
+
+    # Notify course lecturer if someone else reviews
+    if course.lecturer_id and course.lecturer_id != current_user.id:
+        db.add(Notification(
+            user_id=course.lecturer_id,
+            title=f"Đánh giá mới: {course.title}",
+            detail=f"Học viên {current_user.full_name or 'Một học viên'} đã đánh giá {review_data.rating} sao: \"{(review_data.comment or '')[:100]}\"",
+            type="review",
+            related_id=course_id,
+            related_type="course",
+        ))
 
     await db.commit()
     await db.refresh(review)

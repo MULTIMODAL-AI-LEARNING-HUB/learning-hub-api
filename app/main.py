@@ -99,7 +99,18 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if not settings.DEBUG:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
+        if is_viewer_content:
+            # PDF bytes are embedded in an <iframe> by the SPA (blob: or same-origin).
+            # frame-ancestors 'none' + object-src 'none' would force the grey/blank
+            # viewer even when bytes stream fine — allow the SPA origins instead.
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; base-uri 'self'; form-action 'self'; "
+                "frame-ancestors 'self' https://learninghubs.tech https://www.learninghubs.tech; "
+                "object-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: blob: https:; font-src 'self' data:"
+            )
+        else:
+            response.headers["Content-Security-Policy"] = "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
     return response
 
 app.include_router(api_router, prefix="/api/v1")

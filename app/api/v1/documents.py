@@ -236,6 +236,10 @@ async def get_document_content(
     media_type = _INLINE_CONTENT_TYPES.get(ext, "application/octet-stream")
 
     total = len(content)
+    # Inline + unique filename: the browser (and Chrome PDF plugin used by
+    # <iframe>) downloads or refuses to render without an explicit disposition.
+    safe_name = (doc.file_name or f"{doc_id}.{ext or 'pdf'}").replace('"', "")
+    disposition = f'inline; filename="{safe_name}"'
     range_header = request.headers.get("range")
     if range_header and total:
         try:
@@ -255,6 +259,8 @@ async def get_document_content(
                         "Content-Range": f"bytes {start}-{end}/{total}",
                         "Accept-Ranges": "bytes",
                         "Content-Length": str(len(chunk)),
+                        "Content-Disposition": disposition,
+                        "Cache-Control": "private, max-age=300",
                     },
                 )
         except (ValueError, IndexError):
@@ -266,6 +272,8 @@ async def get_document_content(
         headers={
             "Accept-Ranges": "bytes",
             "Content-Length": str(total),
+            "Content-Disposition": disposition,
+            "Cache-Control": "private, max-age=300",
         },
     )
 

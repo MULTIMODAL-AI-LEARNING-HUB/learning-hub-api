@@ -27,6 +27,7 @@ from app.schemas import (
     ChatSessionResponse,
 )
 from app.services.chat_service import ChatService
+from app.services.quota_service import check_ai_token_quota, consume_ai_tokens, estimate_tokens
 from app.utils.pagination import build_pagination
 
 router = APIRouter()
@@ -208,6 +209,7 @@ async def ask(
         if m.role in ("user", "assistant")
     ]
 
+    await check_ai_token_quota(db, current_user)
     await service.add_user_message(session.id, payload.query, course_id)
 
     ai_response = await AiClient().ask({
@@ -223,6 +225,10 @@ async def ask(
     answer = ai_response.get("answer", "")
     citations = ai_response.get("citations")
     await service.add_ai_message(session.id, answer, citations, course_id)
+
+    # Track token usage accurately
+    used_tokens = estimate_tokens(payload.query, answer)
+    await consume_ai_tokens(db, current_user.id, used_tokens)
 
     await RedisCache().delete_pattern(f"cache:sessions:{current_user.id}:*")
 
@@ -305,6 +311,8 @@ async def ask_stream(
         if m.role in ("user", "assistant")
     ]
 
+    await check_ai_token_quota(db, current_user)
+
     service = ChatService(repo)
     await service.add_user_message(session.id, payload.query, course_id)
 
@@ -347,5 +355,12 @@ async def ask_stream(
             if full_answer:
                 await service.add_ai_message(session.id, full_answer, citations or None, course_id)
                 await RedisCache().delete_pattern(f"cache:sessions:{current_user.id}:*")
+                try:
+                    from app.core.database import AsyncSessionLocal
+                    async with AsyncSessionLocal() as session_db:
+                        stream_tokens = estimate_tokens(payload.query, full_answer)
+                        await consume_ai_tokens(session_db, current_user.id, stream_tokens)
+                except Exception:
+                    pass
 
     return StreamingResponse(proxy_stream(), media_type="text/event-stream")

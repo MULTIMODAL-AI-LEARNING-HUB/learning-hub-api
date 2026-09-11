@@ -9,6 +9,7 @@ from app.schemas.admin import (
 from app.schemas.auth import (
     AuthResponse,
     AuthUserResponse,
+    ChangePasswordRequest,
     FacebookLoginRequest,
     ForgotPasswordRequest,
     GoogleLoginRequest,
@@ -79,6 +80,7 @@ __all__ = [
     # Auth
     "AuthResponse",
     "AuthUserResponse",
+    "ChangePasswordRequest",
     "FacebookLoginRequest",
     "ForgotPasswordRequest",
     "GoogleLoginRequest",

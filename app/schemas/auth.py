@@ -81,3 +81,9 @@ class MessageResponse(BaseModel):
 class UpdateProfileRequest(BaseModel):
     full_name: str | None = Field(default=None, max_length=255)
     avatar_url: str | None = Field(default=None, max_length=500)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+

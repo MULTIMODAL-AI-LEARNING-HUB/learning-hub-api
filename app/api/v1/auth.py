@@ -16,6 +16,7 @@ from app.repositories.user_repo import UserRepository
 from app.schemas import (
     AuthResponse,
     AuthUserResponse,
+    ChangePasswordRequest,
     FacebookLoginRequest,
     ForgotPasswordRequest,
     GoogleLoginRequest,
@@ -262,6 +263,51 @@ async def me(current_user: User = Depends(get_current_user)) -> AuthUserResponse
     response = _build_user_response(current_user)
     await cache.set(cache_key, response.model_dump(mode="json"), ttl=settings.REDIS_CACHE_TTL_PROFILE)
     return response
+
+
+@router.post("/change-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
+async def change_password(
+    request: Request,
+    payload: ChangePasswordRequest,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponse:
+    """Change password for the currently authenticated user.
+
+    Verifies the current password, hashes the new password, bumps
+    token_version (invalidating stale sessions), issues fresh tokens to
+    preserve the current session, and clears the cached profile.
+    """
+    from app.core.security import hash_password, verify_password
+    from app.services.auth_service import AuthService
+
+    if not current_user.password_hash or not verify_password(
+        payload.current_password, current_user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu hiện tại không đúng",
+        )
+    if verify_password(payload.new_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu mới phải khác mật khẩu hiện tại",
+        )
+
+    service = AuthService(UserRepository(db))
+    new_version = (current_user.token_version or 0) + 1
+    await service.repo.update_password(
+        current_user.id, hash_password(payload.new_password), token_version=new_version
+    )
+    access_token = service.build_access_token(current_user.id, new_version)
+    refresh_token = service.build_refresh_token(current_user.id, new_version)
+    _set_refresh_cookie(response, refresh_token)
+
+    cache = RedisCache()
+    await cache.delete(RedisCache.cache_key_profile(current_user.id))
+    return MessageResponse(message="Đổi mật khẩu thành công")
 
 
 @router.put("/me", response_model=AuthUserResponse)

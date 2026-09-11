@@ -110,6 +110,9 @@ DDL_STATEMENTS = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS ix_quiz_questions_quiz_set_id ON quiz_questions (quiz_set_id)",
+    "UPDATE quotas SET token_limit = 2000000 WHERE token_limit < 2000000",
+    "UPDATE quotas SET storage_limit_mb = 10240 WHERE storage_limit_mb < 10240",
+    "UPDATE quotas SET video_limit = 50 WHERE video_limit < 50",
     "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)",
     "DELETE FROM alembic_version",
     f"INSERT INTO alembic_version (version_num) VALUES ('{HEAD_REVISION}')",

@@ -40,7 +40,7 @@ async def init_db() -> None:
                 storage_used_mb=0,
                 video_limit=50,
                 video_used=0,
-                token_limit=500000,
+                token_limit=2000000,
                 token_used=0
             )
             session.add(quota)

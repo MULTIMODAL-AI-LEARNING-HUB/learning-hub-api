@@ -90,6 +90,52 @@ async def search_users(
     ]
 
 
+async def _serialize_room(
+    room: SocialChatRoom,
+    db: AsyncSession,
+    current_user: User,
+) -> SocialChatRoomResponse:
+    member_count = (
+        await db.execute(select(func.count(SocialChatMember.id)).where(SocialChatMember.room_id == room.id))
+    ).scalar_one()
+    last_message = (
+        await db.execute(
+            select(SocialChatMessage.content)
+            .where(SocialChatMessage.room_id == room.id)
+            .order_by(SocialChatMessage.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    display_name = room.name
+    display_description = room.description
+    if room.kind == "direct":
+        partner = (
+            await db.execute(
+                select(User)
+                .join(SocialChatMember, SocialChatMember.user_id == User.id)
+                .where(
+                    SocialChatMember.room_id == room.id,
+                    User.id != current_user.id,
+                )
+                .limit(1)
+            )
+        ).scalars().first()
+        if partner:
+            display_name = partner.full_name or partner.email
+            display_description = f"Trò chuyện trực tiếp với {display_name}"
+
+    return SocialChatRoomResponse(
+        id=room.id,
+        name=display_name,
+        description=display_description,
+        kind=room.kind,
+        member_count=member_count,
+        last_message=last_message,
+        updated_at=room.updated_at,
+    )
+
+
 @router.get("/rooms", response_model=SocialChatRoomsResponse)
 async def list_rooms(
     db: AsyncSession = Depends(get_db),
@@ -106,30 +152,61 @@ async def list_rooms(
 
     items: list[SocialChatRoomResponse] = []
     for room in rooms:
-        member_count = (
-            await db.execute(select(func.count(SocialChatMember.id)).where(SocialChatMember.room_id == room.id))
-        ).scalar_one()
-        last_message = (
-            await db.execute(
-                select(SocialChatMessage.content)
-                .where(SocialChatMessage.room_id == room.id)
-                .order_by(SocialChatMessage.created_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        items.append(
-            SocialChatRoomResponse(
-                id=room.id,
-                name=room.name,
-                description=room.description,
-                kind=room.kind,
-                member_count=member_count,
-                last_message=last_message,
-                updated_at=room.updated_at,
-            )
-        )
+        items.append(await _serialize_room(room, db, current_user))
 
     return SocialChatRoomsResponse(items=items, total=len(items))
+
+
+@router.post("/direct/{other_user_id}", response_model=SocialChatRoomResponse, status_code=status.HTTP_200_OK)
+async def get_or_create_direct_room(
+    other_user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SocialChatRoomResponse:
+    """Find or create a 1-on-1 direct room between current user and other user."""
+    if other_user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể tạo trò chuyện với chính mình")
+
+    partner = await db.get(User, other_user_id)
+    if not partner or not partner.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy người dùng")
+
+    # Find existing direct room containing exactly these two members.
+    candidate_room_ids = (
+        await db.execute(
+            select(SocialChatRoom.id)
+            .join(SocialChatMember, SocialChatMember.room_id == SocialChatRoom.id)
+            .where(
+                SocialChatRoom.kind == "direct",
+                SocialChatMember.user_id == current_user.id,
+            )
+        )
+    ).scalars().all()
+    for room_id in candidate_room_ids:
+        member_ids = (
+            await db.execute(
+                select(SocialChatMember.user_id).where(SocialChatMember.room_id == room_id)
+            )
+        ).scalars().all()
+        if set(member_ids) == {current_user.id, other_user_id}:
+            room = await db.get(SocialChatRoom, room_id)
+            if room:
+                return await _serialize_room(room, db, current_user)
+
+    partner_name = partner.full_name or partner.email
+    room = SocialChatRoom(
+        name=f"Trò chuyện với {partner_name}",
+        description=None,
+        kind="direct",
+        created_by=current_user.id,
+    )
+    db.add(room)
+    await db.flush()
+    db.add(SocialChatMember(room_id=room.id, user_id=current_user.id, role="owner"))
+    db.add(SocialChatMember(room_id=room.id, user_id=other_user_id, role="member"))
+    await db.commit()
+    await db.refresh(room)
+    return await _serialize_room(room, db, current_user)
 
 
 @router.post("/rooms", response_model=SocialChatRoomResponse, status_code=status.HTTP_201_CREATED)

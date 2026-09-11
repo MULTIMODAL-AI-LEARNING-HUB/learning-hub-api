@@ -38,11 +38,11 @@ class AuthService:
 
         from app.models.quota import Quota
         quota = Quota(
-            storage_limit_mb=1024,
+            storage_limit_mb=10240,
             storage_used_mb=0,
-            video_limit=5,
+            video_limit=50,
             video_used=0,
-            token_limit=50000,
+            token_limit=2000000,
             token_used=0
         )
         user = User(

@@ -301,7 +301,6 @@ async def change_password(
     await service.repo.update_password(
         current_user.id, hash_password(payload.new_password), token_version=new_version
     )
-    access_token = service.build_access_token(current_user.id, new_version)
     refresh_token = service.build_refresh_token(current_user.id, new_version)
     _set_refresh_cookie(response, refresh_token)
 

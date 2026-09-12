@@ -110,6 +110,9 @@ DDL_STATEMENTS = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS ix_quiz_questions_quiz_set_id ON quiz_questions (quiz_set_id)",
+    "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS mindmap_markdown TEXT NULL",
+    "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS audio_summary_url VARCHAR(500) NULL",
+    "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS answers_detail JSONB NULL",
     "UPDATE quotas SET token_limit = 2000000 WHERE token_limit < 2000000",
     "UPDATE quotas SET storage_limit_mb = 10240 WHERE storage_limit_mb < 10240",
     "UPDATE quotas SET video_limit = 50 WHERE video_limit < 50",

@@ -1,9 +1,9 @@
 import enum
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -57,6 +57,8 @@ class Lesson(Base):
     order_index: Mapped[int] = mapped_column(Integer, default=0)
     is_preview: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    mindmap_markdown: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    audio_summary_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
@@ -139,6 +141,7 @@ class QuizAttempt(Base):
     score: Mapped[Optional[float]] = mapped_column(Integer)
     max_score: Mapped[Optional[float]] = mapped_column(Integer)
     passed: Mapped[Optional[bool]] = mapped_column(Boolean)
+    answers_detail: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 

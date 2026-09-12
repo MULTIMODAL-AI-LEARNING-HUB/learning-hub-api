@@ -218,6 +218,7 @@ async def ask(
         "query": payload.query,
         "course_id": str(course_id) if course_id else None,
         "lesson_id": str(lesson_id) if lesson_id else None,
+        "tutor_mode": payload.tutor_mode or "standard",
         "document_ids": [str(d) for d in payload.document_ids or []],
         "chat_history": chat_history,
     })
@@ -322,6 +323,7 @@ async def ask_stream(
         "query": payload.query,
         "course_id": str(course_id) if course_id else None,
         "lesson_id": str(lesson_id) if lesson_id else None,
+        "tutor_mode": payload.tutor_mode or "standard",
         "document_ids": [str(d) for d in payload.document_ids or []],
         "chat_history": chat_history,
     }

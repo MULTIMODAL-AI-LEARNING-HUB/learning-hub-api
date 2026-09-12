@@ -1,13 +1,16 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    adaptive,
     admin,
+    audio,
     auth,
     categories,
     chat,
     courses,
     documents,
     enrollments,
+    mindmap,
     payments,
     progress,
     study,
@@ -49,6 +52,9 @@ api_router.include_router(progress.router, tags=["progress"])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(study.router, prefix="/study", tags=["study"])
+api_router.include_router(adaptive.router, prefix="/adaptive", tags=["adaptive"])
+api_router.include_router(mindmap.router, tags=["mindmap"])
+api_router.include_router(audio.router, tags=["audio"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(wishlist_router, prefix="/wishlist", tags=["wishlist"])

@@ -44,6 +44,7 @@ class ChatAskRequest(BaseModel):
     course_id: UUID | None = None
     lesson_id: UUID | None = None
     document_ids: list[UUID] | None = None
+    tutor_mode: str | None = "standard"
 
 
 class ChatMessageResponse(BaseModel):

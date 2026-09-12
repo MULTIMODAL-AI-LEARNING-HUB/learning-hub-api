@@ -437,6 +437,58 @@ async def _sync_active_keys_to_ai_service(db: AsyncSession):
         logger.warning(f"Failed to sync AI keys to AI service: {e}")
 
 
+async def sync_ai_key_usage_to_db(db: AsyncSession) -> None:
+    """Fetch live key usage metrics from AI service and persist updates to database."""
+    try:
+        ai_status = await AiClient().get_keys_status()
+        live_keys = ai_status.get("keys", [])
+        if not live_keys:
+            # AI service may have restarted or lacks DB keys; resync
+            await _sync_active_keys_to_ai_service(db)
+            return
+
+        usage_by_id: dict[str, dict] = {
+            str(k["id"]): k for k in live_keys if k.get("id")
+        }
+        usage_by_name_provider: dict[tuple[str, str], dict] = {
+            (str(k.get("provider", "")).lower().strip(), str(k.get("name", "")).strip()): k
+            for k in live_keys
+        }
+
+        result = await db.execute(select(AiApiKey))
+        all_keys = result.scalars().all()
+        db_changed = False
+
+        for db_key in all_keys:
+            matched_live = usage_by_id.get(str(db_key.id))
+            if not matched_live:
+                matched_live = usage_by_name_provider.get(
+                    (db_key.provider.lower().strip(), db_key.key_name.strip())
+                )
+
+            if matched_live:
+                live_usage = int(matched_live.get("usage_count") or 0)
+                if live_usage > db_key.usage_count:
+                    db_key.usage_count = live_usage
+                    db_changed = True
+
+                live_last_used = matched_live.get("last_used_at")
+                if live_last_used:
+                    from datetime import datetime, timezone
+                    try:
+                        dt = datetime.fromtimestamp(live_last_used, tz=timezone.utc).replace(tzinfo=None)
+                        if db_key.last_used_at is None or dt > db_key.last_used_at:
+                            db_key.last_used_at = dt
+                            db_changed = True
+                    except Exception:
+                        pass
+
+        if db_changed:
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Could not synchronize AI key usage from AI service: %s", exc)
+
+
 @router.get("/ai-keys", response_model=AiApiKeyListResponse)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_ai_keys(
@@ -446,6 +498,9 @@ async def list_ai_keys(
     current_user: User = Depends(require_admin),
 ):
     """List all configured AI API keys with masked key values. Admin only."""
+    # Synchronize latest usage counts before returning
+    await sync_ai_key_usage_to_db(db)
+
     query = select(AiApiKey)
     if provider:
         query = query.where(AiApiKey.provider == provider.lower().strip())

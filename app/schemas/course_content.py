@@ -259,6 +259,7 @@ class QuizAttemptResponse(BaseModel):
     score: Optional[float]
     max_score: Optional[float]
     passed: Optional[bool]
+    answers_detail: Optional[List[dict]] = None
     started_at: datetime
     completed_at: Optional[datetime]
 

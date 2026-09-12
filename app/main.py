@@ -48,9 +48,52 @@ async def lifespan(app: FastAPI):
                 logger.info("Encrypted %d legacy AI API key(s)", migrated)
     except Exception:
         logger.exception("Could not migrate legacy AI API keys")
-    
+
+    # Synchronize AI keys to AI service on startup
+    try:
+        from app.api.v1.admin import _sync_active_keys_to_ai_service
+        async with AsyncSessionLocal() as db:
+            await _sync_active_keys_to_ai_service(db)
+            logger.info("Synchronized active AI API keys to AI service on startup")
+    except Exception as exc:
+        logger.warning("Could not sync active AI API keys on startup: %s", exc)
+
+    # Safe schema evolution for quiz_attempts.answers_detail and lesson multimodal fields
+    try:
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS answers_detail JSONB DEFAULT '[]'::jsonb;"))
+            await db.execute(text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS mindmap_markdown TEXT NULL;"))
+            await db.execute(text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS audio_summary_url VARCHAR(500) NULL;"))
+            await db.commit()
+    except Exception as exc:
+        logger.debug("Schema evolution notice: %s", exc)
+
+    # Periodic background task to persist AI key usage metrics to DB
+    import asyncio
+    async def _periodic_key_usage_sync():
+        while True:
+            try:
+                await asyncio.sleep(60)
+                from app.api.v1.admin import sync_ai_key_usage_to_db
+                async with AsyncSessionLocal() as db:
+                    await sync_ai_key_usage_to_db(db)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.debug("Periodic AI key usage sync skipped: %s", exc)
+
+    key_sync_task = asyncio.create_task(_periodic_key_usage_sync())
+
     yield
-    
+
+    if key_sync_task and not key_sync_task.done():
+        key_sync_task.cancel()
+        try:
+            await key_sync_task
+        except asyncio.CancelledError:
+            pass
+
     logger.info("Closing connection pools...")
     # 3. Clean up Redis Pool
     await close_redis()

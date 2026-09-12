@@ -592,6 +592,7 @@ async def submit_quiz_attempt(
         if str(submitted_answer.get("question_id")) not in question_ids:
             raise HTTPException(status_code=400, detail="Answer contains an invalid question")
 
+    details: list[dict] = []
     for question in questions:
         total_points += question.points
         question_answers_result = await db.execute(
@@ -601,11 +602,24 @@ async def submit_quiz_attempt(
         correct_answer_ids = [a.id for a in question_answers if a.is_correct]
 
         submission_for_q = next((s for s in submission.answers if s.get("question_id") == str(question.id)), None)
-        if submission_for_q:
-            selected = submission_for_q.get("selected_answers", [])
-            if set(selected) == set(str(a) for a in correct_answer_ids):
-                correct_count += 1
-                earned_points += question.points
+        selected = (submission_for_q or {}).get("selected_answers", []) if submission_for_q else []
+        is_correct = bool(submission_for_q) and set(selected) == set(str(a) for a in correct_answer_ids)
+        if is_correct:
+            correct_count += 1
+            earned_points += question.points
+        details.append(
+            {
+                "question_id": str(question.id),
+                "question_text": question.question_text,
+                "question_type": question.type,
+                "points": question.points,
+                "earned_points": question.points if is_correct else 0,
+                "is_correct": is_correct,
+                "selected_answers": selected,
+                "correct_answers": [str(a) for a in correct_answer_ids],
+                "explanation": question.explanation,
+            }
+        )
 
     score = (earned_points / total_points * 100) if total_points > 0 else 0
     passed = score >= quiz.passing_score
@@ -613,6 +627,7 @@ async def submit_quiz_attempt(
     attempt.score = score
     attempt.max_score = 100
     attempt.passed = passed
+    attempt.answers_detail = details
     attempt.completed_at = datetime.now()
 
     await db.commit()

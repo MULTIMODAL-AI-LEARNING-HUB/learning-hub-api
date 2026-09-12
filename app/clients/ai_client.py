@@ -100,6 +100,47 @@ class AiClient:
         response.raise_for_status()
         return response.json()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True
+    )
+    async def generate_remedial_quiz(
+        self,
+        missed_questions: list[dict[str, Any]],
+        lesson_id: str | None = None,
+        course_id: str | None = None,
+        lesson_title: str | None = "",
+        lesson_content: str | None = "",
+        question_count: int = 3,
+    ) -> dict[str, Any]:
+        """Request AI service to generate a targeted remedial micro-quiz."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
+        payload = {
+            "missed_questions": missed_questions,
+            "lesson_id": lesson_id,
+            "course_id": course_id,
+            "lesson_title": lesson_title or "",
+            "lesson_content": lesson_content or "",
+            "question_count": question_count,
+        }
+        response = await self.client.post("/study/quiz/remedial", json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True
+    )
+    async def generate_mindmap(self, content: str, title: str = "") -> dict[str, Any]:
+        """Request AI service to generate Markdown mindmap tree."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
+        payload = {"content": content, "title": title}
+        response = await self.client.post("/study/mindmap/generate", json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
     async def sync_keys(self, keys: list[dict[str, Any]]) -> dict[str, Any]:
         """Synchronize active AI API keys to the AI service."""
         headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
@@ -109,4 +150,15 @@ class AiClient:
             return response.json()
         except Exception:
             return {"synced": False}
+
+    async def get_keys_status(self) -> dict[str, Any]:
+        """Fetch runtime key rotation status and usage counters from AI service."""
+        headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}
+        try:
+            response = await self.client.get("/internal/keys/status", headers=headers, timeout=5.0)
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return {"keys": []}
+
 

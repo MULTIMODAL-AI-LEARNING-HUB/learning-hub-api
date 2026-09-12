@@ -6,11 +6,8 @@ caches the result URL in lessons.audio_summary_url to avoid redundant generation
 
 import asyncio
 import logging
-import tempfile
-from io import BytesIO
 from uuid import UUID
 
-import edge_tts
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,6 +53,11 @@ def _build_summary_script(lesson) -> str:
 
 async def _generate_tts_audio(text: str, voice: str = VOICE_FEMALE) -> bytes:
     """Generate audio bytes from text via edge-tts."""
+    try:
+        import edge_tts
+    except ImportError:
+        raise RuntimeError("edge-tts library is not installed")
+
     communicate = edge_tts.Communicate(text, voice)
     chunks = []
     async for chunk in communicate.stream():
@@ -128,7 +130,6 @@ async def get_lesson_audio_summary(
     # Resolve public URL from storage URI
     minio = MinioClient()
     if storage_uri.startswith("s3://"):
-        key = storage_uri.split("/", 3)[-1]  # strip s3://bucket/
         audio_url = minio.get_presigned_url(storage_uri, expires_seconds=86400)
     else:
         # Local fallback — expose via an API route

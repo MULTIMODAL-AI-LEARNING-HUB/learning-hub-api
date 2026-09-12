@@ -1,13 +1,11 @@
 """Adaptive Learning and Weak-point Remediation endpoints."""
 
 import logging
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.clients.ai_client import AiClient
 from app.dependencies.auth import get_current_user

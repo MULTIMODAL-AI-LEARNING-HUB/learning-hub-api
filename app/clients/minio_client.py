@@ -109,8 +109,13 @@ class MinioClient:
                 logger.warning("Local read_bytes failed: %s", e)
         return None
 
-    def get_presigned_url(self, key: str, expires_seconds: int = 3600) -> str:
-        """Generate a presigned GET URL for an object or local download route."""
+    def get_presigned_url(self, key: str, expires_seconds: int = 86400) -> str:
+        """Generate a presigned GET URL for an object or local download route.
+
+        Default TTL is 24 hours (86400 s) so that video/attachment URLs embedded
+        in the frontend remain playable for a full day without requiring a page
+        reload.  Callers that need a shorter window can pass a smaller value.
+        """
         clean_key = key.replace(f"s3://{self.bucket}/", "").replace("file://", "")
         if self.client:
             try:

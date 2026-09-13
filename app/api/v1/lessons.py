@@ -176,9 +176,21 @@ async def get_lesson(
     await verify_lesson_access(lesson, course, current_user, db)
 
     # Generate presigned URLs for video_url and attachments
-    if lesson.video_url and lesson.video_url.startswith("s3://"):
+    if lesson.video_url:
         try:
-            lesson.video_url = MinioClient().get_presigned_url(lesson.video_url)
+            # Repair legacy rows where an expired presigned URL was persisted
+            # directly (see _normalize_video_url): parse it back to s3:// first.
+            storage_uri = lesson.video_url
+            if storage_uri.startswith("http://") or storage_uri.startswith("https://"):
+                try:
+                    normalized = _normalize_video_url(storage_uri)
+                    if normalized and normalized.startswith("s3://"):
+                        storage_uri = normalized
+                        lesson.video_url = normalized
+                except HTTPException:
+                    pass  # external embed link — serve as-is
+            if storage_uri.startswith("s3://"):
+                lesson.video_url = MinioClient().get_presigned_url(storage_uri)
         except Exception:
             pass
 
@@ -191,6 +203,42 @@ async def get_lesson(
                     pass
 
     return lesson
+
+
+def _normalize_video_url(value: str | None) -> str | None:
+    """Normalize a lesson video_url to a stable storage URI before persisting.
+
+    The frontend may pass back a presigned (temporary) URL produced by the
+    attachment-upload response. Those URLs expire, so storing them directly
+    breaks playback. Convert presigned URLs back to the ``s3://`` storage
+    URI so ``get_lesson`` can mint a fresh presigned URL on every read.
+    YouTube/Vimeo embeds and ``s3://`` values pass through unchanged.
+    """
+    if not value:
+        return value
+    value = value.strip()
+    if value.startswith("s3://"):
+        return value
+    if value.startswith("http://") or value.startswith("https://"):
+        parsed = urlparse(value)
+        # An internal presigned S3/MinIO URL always carries the query
+        # signature parameters — rebuild the canonical storage URI from it.
+        query = parsed.query or ""
+        if "X-Amz-Signature" in query or "X-Amz-Expires" in query or "signature" in query.lower():
+            bucket = settings.MINIO_BUCKET_NAME
+            # S3 virtual-hosted style: https://bucket.host/key
+            # S3 path style:      https://host/bucket/key
+            path_parts = parsed.path.lstrip("/").split("/", 1)
+            if path_parts and path_parts[0] == bucket and len(path_parts) == 2:
+                return f"s3://{bucket}/{path_parts[1]}"
+            if parsed.hostname and parsed.hostname.startswith(f"{bucket}.") and parsed.path:
+                return f"s3://{bucket}/{parsed.path.lstrip('/')}"
+            # Unknown host for a signed URL — reject rather than persist it
+            raise HTTPException(
+                status_code=400,
+                detail="video_url must be an s3:// storage URI or a public video link",
+            )
+    return value
 
 
 @router.put("/{lesson_id}", response_model=LessonResponse)
@@ -211,7 +259,11 @@ async def update_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
 
-    for key, value in lesson_data.model_dump(exclude_unset=True).items():
+    payload = lesson_data.model_dump(exclude_unset=True)
+    if "video_url" in payload:
+        payload["video_url"] = _normalize_video_url(payload["video_url"])
+
+    for key, value in payload.items():
         setattr(lesson, key, value)
 
     await db.commit()

@@ -109,6 +109,61 @@ class MinioClient:
                 logger.warning("Local read_bytes failed: %s", e)
         return None
 
+    def get_object_range(
+        self, key: str, offset: int = 0, length: int = -1
+    ) -> tuple[bytes | None, int | None]:
+        """Fetch a byte range from MinIO/local storage.
+
+        Returns ``(data, total_size)``. ``data`` is ``None`` when the object
+        cannot be found. ``total_size`` may be ``None`` for the local
+        fallback when stat info is unavailable (callers treat it as unknown).
+        """
+        clean_key = key.replace(f"s3://{self.bucket}/", "").replace("file://", "")
+        if self.client:
+            try:
+                stat = self.client.stat_object(self.bucket, clean_key)
+                total = int(stat.size or 0)
+                if offset >= total:
+                    return b"", total
+                response = self.client.get_object(
+                    self.bucket, clean_key, offset=offset, length=length
+                )
+                try:
+                    return response.read(), total
+                finally:
+                    response.close()
+                    response.release_conn()
+            except Exception as e:
+                logger.warning("MinIO range get_object failed: %s", e)
+
+        file_path = LOCAL_STORAGE_DIR / clean_key
+        if file_path.is_file():
+            try:
+                total = file_path.stat().st_size
+                with open(file_path, "rb") as fh:
+                    fh.seek(max(0, offset))
+                    data = fh.read() if length is None or length < 0 else fh.read(length)
+                return data, total
+            except Exception as e:
+                logger.warning("Local range read failed: %s", e)
+        return None, None
+
+    def get_object_size(self, key: str) -> int | None:
+        """Return the object size in bytes, or None when unavailable."""
+        clean_key = key.replace(f"s3://{self.bucket}/", "").replace("file://", "")
+        if self.client:
+            try:
+                return int(self.client.stat_object(self.bucket, clean_key).size or 0)
+            except Exception:
+                pass
+        file_path = LOCAL_STORAGE_DIR / clean_key
+        if file_path.is_file():
+            try:
+                return file_path.stat().st_size
+            except Exception:
+                return None
+        return None
+
     def get_presigned_url(self, key: str, expires_seconds: int = 86400) -> str:
         """Generate a presigned GET URL for an object or local download route.
 

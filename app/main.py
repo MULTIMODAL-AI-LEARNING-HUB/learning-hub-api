@@ -117,7 +117,8 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Internal-API-Key"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Internal-API-Key", "Range"],
+    expose_headers=["Content-Range", "Accept-Ranges", "Content-Length", "Content-Disposition"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 trusted_proxy_hosts = [host.strip() for host in settings.TRUSTED_PROXY_IPS.split(",") if host.strip()]

@@ -18,7 +18,7 @@ async def get_current_user_flexible(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Authenticate user from Authorization header or 'token' query parameter.
+    """Authenticate user from Authorization header, 'token' query parameter, or session cookie.
 
     Enables authenticated streaming into <iframe>, <video>, and <audio> elements
     where browsers cannot inject custom Bearer Authorization headers.
@@ -29,6 +29,8 @@ async def get_current_user_flexible(
         token = auth_header[len("Bearer "):].strip()
     if not token:
         token = request.query_params.get("token")
+    if not token:
+        token = request.cookies.get("access_token")
 
     if not token:
         raise HTTPException(

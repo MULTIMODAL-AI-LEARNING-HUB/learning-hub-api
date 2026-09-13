@@ -110,7 +110,7 @@ class MinioClient:
         return None
 
     def get_object_range(
-        self, key: str, offset: int = 0, length: int = -1
+        self, key: str, offset: int = 0, length: int = 0
     ) -> tuple[bytes | None, int | None]:
         """Fetch a byte range from MinIO/local storage.
 
@@ -125,8 +125,11 @@ class MinioClient:
                 total = int(stat.size or 0)
                 if offset >= total:
                     return b"", total
+                # In minio-py, length=0 signals streaming to the end of the object.
+                # A negative length causes an invalid negative Range header (bytes=0--2).
+                length_arg = max(0, length) if length and length > 0 else 0
                 response = self.client.get_object(
-                    self.bucket, clean_key, offset=offset, length=length
+                    self.bucket, clean_key, offset=offset, length=length_arg
                 )
                 try:
                     return response.read(), total
@@ -142,7 +145,7 @@ class MinioClient:
                 total = file_path.stat().st_size
                 with open(file_path, "rb") as fh:
                     fh.seek(max(0, offset))
-                    data = fh.read() if length is None or length < 0 else fh.read(length)
+                    data = fh.read(length) if length and length > 0 else fh.read()
                 return data, total
             except Exception as e:
                 logger.warning("Local range read failed: %s", e)

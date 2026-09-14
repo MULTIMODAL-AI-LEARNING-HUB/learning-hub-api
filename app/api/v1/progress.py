@@ -10,7 +10,6 @@ from sqlalchemy import func, select
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
 from app.models.course_content import Lesson, Section
-from app.models.lesson_progress import LessonProgress
 from app.models.user import User
 from app.repositories.course_material_repo import CourseMaterialRepository
 from app.repositories.course_repo import CourseRepository

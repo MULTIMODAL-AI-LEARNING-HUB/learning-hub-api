@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from app.core.database import engine
 
-HEAD_REVISION = "f5a6b7c8d9e0"
+HEAD_REVISION = "b7c8d9e0f1a2"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(message)s")
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,36 @@ DDL_STATEMENTS = [
     "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS mindmap_markdown TEXT NULL",
     "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS audio_summary_url VARCHAR(500) NULL",
     "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS answers_detail JSONB NULL",
+    """
+    CREATE TABLE IF NOT EXISTS notes (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        lesson_id UUID NULL REFERENCES lessons(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_notes_user_id ON notes (user_id)",
+    "CREATE INDEX IF NOT EXISTS ix_notes_course_id ON notes (course_id)",
+    "CREATE INDEX IF NOT EXISTS ix_notes_lesson_id ON notes (lesson_id)",
+    "CREATE INDEX IF NOT EXISTS ix_notes_user_course ON notes (user_id, course_id)",
+    "CREATE INDEX IF NOT EXISTS ix_notes_user_lesson ON notes (user_id, lesson_id)",
+    """
+    CREATE TABLE IF NOT EXISTS lesson_progress (
+        id UUID PRIMARY KEY,
+        enrollment_id UUID NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+        lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+        completed BOOLEAN NOT NULL DEFAULT FALSE,
+        completed_at TIMESTAMP WITHOUT TIME ZONE NULL,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        CONSTRAINT uq_enrollment_lesson UNIQUE (enrollment_id, lesson_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_lesson_progress_enrollment_id ON lesson_progress (enrollment_id)",
+    "CREATE INDEX IF NOT EXISTS ix_lesson_progress_lesson_id ON lesson_progress (lesson_id)",
     "UPDATE quotas SET token_limit = 2000000 WHERE token_limit < 2000000",
     "UPDATE quotas SET storage_limit_mb = 10240 WHERE storage_limit_mb < 10240",
     "UPDATE quotas SET video_limit = 50 WHERE video_limit < 50",

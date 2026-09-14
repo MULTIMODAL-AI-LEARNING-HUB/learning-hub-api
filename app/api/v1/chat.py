@@ -178,6 +178,7 @@ async def ask(
     if session_lesson_id and lesson_id and session_lesson_id != lesson_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session lesson cannot be changed")
 
+    course = None
     if course_id:
         course_repo = CourseRepository(db)
         course = await course_repo.get_by_id(course_id)
@@ -198,6 +199,7 @@ async def ask(
             if not await verify_course_access(lesson_course, current_user, db):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enrolled in this course")
             course_id = lesson_course.id
+            course = lesson_course
 
     service = ChatService(repo)
 
@@ -212,14 +214,18 @@ async def ask(
     await check_ai_token_quota(db, current_user)
     await service.add_user_message(session.id, payload.query, course_id)
 
+    course_title = payload.course_title or (course.title if course_id and course else None)
+
     ai_response = await AiClient().ask({
         "session_id": str(session.id),
         "user_id": str(current_user.id),
         "query": payload.query,
         "course_id": str(course_id) if course_id else None,
         "lesson_id": str(lesson_id) if lesson_id else None,
+        "course_title": course_title,
+        "strict_course": True if course_id else payload.strict_course,
         "tutor_mode": payload.tutor_mode or "standard",
-        "document_ids": [str(d) for d in payload.document_ids or []],
+        "document_ids": [] if course_id else [str(d) for d in payload.document_ids or []],
         "chat_history": chat_history,
     })
 
@@ -303,6 +309,18 @@ async def ask_stream(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Course not available")
         if not await verify_course_access(course, current_user, db):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enrolled in this course")
+    else:
+        course = None
+
+    if lesson_id:
+        lesson, lesson_course = await get_lesson_with_course(db, lesson_id)
+        if course_id and lesson_course.id != course_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+        if not course_id:
+            if not await verify_course_access(lesson_course, current_user, db):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enrolled in this course")
+            course_id = lesson_course.id
+            course = lesson_course
 
     # Fetch history before adding current message
     history_messages = await repo.list_messages(session.id, offset=0, limit=20)
@@ -317,14 +335,18 @@ async def ask_stream(
     service = ChatService(repo)
     await service.add_user_message(session.id, payload.query, course_id)
 
+    course_title = payload.course_title or (course.title if course_id and course else None)
+
     stream_payload = {
         "session_id": str(session.id),
         "user_id": str(current_user.id),
         "query": payload.query,
         "course_id": str(course_id) if course_id else None,
         "lesson_id": str(lesson_id) if lesson_id else None,
+        "course_title": course_title,
+        "strict_course": True if course_id else payload.strict_course,
         "tutor_mode": payload.tutor_mode or "standard",
-        "document_ids": [str(d) for d in payload.document_ids or []],
+        "document_ids": [] if course_id else [str(d) for d in payload.document_ids or []],
         "chat_history": chat_history,
     }
     headers = {"X-Internal-API-Key": settings.INTERNAL_API_KEY}

@@ -45,6 +45,8 @@ class ChatAskRequest(BaseModel):
     lesson_id: UUID | None = None
     document_ids: list[UUID] | None = None
     tutor_mode: str | None = "standard"
+    course_title: str | None = Field(default=None, max_length=255)
+    strict_course: bool = False
 
 
 class ChatMessageResponse(BaseModel):

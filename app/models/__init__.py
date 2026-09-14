@@ -22,7 +22,9 @@ from app.models.document import Document
 from app.models.enrollment import Enrollment
 from app.models.essay import EssaySubmission
 from app.models.flashcard import Flashcard, FlashcardItem
+from app.models.lesson_progress import LessonProgress
 from app.models.material_progress import MaterialProgress
+from app.models.note import Note
 from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.quota import Quota
@@ -46,7 +48,9 @@ __all__ = [
     "Course",
     "CourseMaterial",
     "Enrollment",
+    "LessonProgress",
     "MaterialProgress",
+    "Note",
     "Payment",
     "Section",
     "Lesson",

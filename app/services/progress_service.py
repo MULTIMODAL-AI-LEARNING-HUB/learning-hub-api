@@ -43,27 +43,43 @@ class ProgressService:
 
     async def get_course_completion_percent(
         self,
-        enrollment_id: UUID
+        enrollment_id: UUID,
+        total_lessons: int = 0,
+        completed_lessons: int = 0,
     ) -> float:
         enrollment = await self.enrollment_repo.get_by_id(enrollment_id)
         if not enrollment:
             return 0.0
 
         total_materials = await self.material_repo.count_by_course(enrollment.course_id)
-        if total_materials == 0:
+        completed_materials = await self.progress_repo.count_completed(enrollment_id)
+
+        total = total_materials + total_lessons
+        if total == 0:
             return 0.0
 
-        completed_count = await self.progress_repo.count_completed(enrollment_id)
-        return (completed_count / total_materials) * 100
+        completed = completed_materials + completed_lessons
+        percent = round((completed / total) * 100, 1)
 
-    async def is_enrollment_complete(self, enrollment_id: UUID) -> bool:
+        # Persist updated percentage back to enrollment
+        enrollment.progress_percent = int(percent)
+        await self.enrollment_repo.db.commit()
+
+        return percent
+
+    async def is_enrollment_complete(
+        self, enrollment_id: UUID, total_lessons: int = 0, completed_lessons: int = 0
+    ) -> bool:
         enrollment = await self.enrollment_repo.get_by_id(enrollment_id)
         if not enrollment:
             return False
 
         total_materials = await self.material_repo.count_by_course(enrollment.course_id)
-        if total_materials == 0:
+        completed_materials = await self.progress_repo.count_completed(enrollment_id)
+
+        total = total_materials + total_lessons
+        if total == 0:
             return False
 
-        completed_count = await self.progress_repo.count_completed(enrollment_id)
-        return completed_count == total_materials
+        completed = completed_materials + completed_lessons
+        return completed == total

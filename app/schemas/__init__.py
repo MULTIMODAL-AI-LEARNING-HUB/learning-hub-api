@@ -72,6 +72,8 @@ from app.schemas.enrollment import (
 )
 from app.schemas.progress import (
     EnrollmentProgressResponse,
+    LessonProgressResponse,
+    LessonProgressUpdate,
     MaterialProgressResponse,
     MaterialProgressUpdate,
 )
@@ -130,6 +132,8 @@ __all__ = [
     "PaymentIntentResponse",
     # Progress
     "EnrollmentProgressResponse",
+    "LessonProgressResponse",
+    "LessonProgressUpdate",
     "MaterialProgressResponse",
     "MaterialProgressUpdate",
     # Admin

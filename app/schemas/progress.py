@@ -25,10 +25,27 @@ class MaterialProgressResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LessonProgressUpdate(BaseModel):
+    completed: bool
+
+
+class LessonProgressResponse(BaseModel):
+    id: UUID
+    enrollment_id: UUID
+    lesson_id: UUID
+    completed: bool
+    completed_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EnrollmentProgressResponse(BaseModel):
     enrollment_id: UUID
     course_id: UUID
     total_materials: int
     completed_materials: int
+    total_lessons: int = 0
+    completed_lessons: int = 0
+    completed_lesson_ids: list[UUID] = []
     completion_percent: float
     materials: list[MaterialProgressResponse]

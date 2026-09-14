@@ -11,6 +11,7 @@ from app.api.v1 import (
     documents,
     enrollments,
     mindmap,
+    notes,
     payments,
     progress,
     study,
@@ -47,6 +48,7 @@ api_router.include_router(discussions_router, tags=["Discussions"])
 api_router.include_router(course_discussions_router, tags=["Discussions"])
 api_router.include_router(reviews_router, prefix="/courses", tags=["reviews"])
 api_router.include_router(enrollments.router, tags=["enrollments"])
+api_router.include_router(notes.router)
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(progress.router, tags=["progress"])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])

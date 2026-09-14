@@ -23,6 +23,7 @@ from app.api.v1.course_materials import router as course_materials_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.discussions import (
     course_discussions_router,
+    direct_discussions_router,
     router as discussions_router,
 )
 from app.api.v1.lessons import router as lessons_router
@@ -45,6 +46,7 @@ api_router.include_router(lessons_router)
 api_router.include_router(quizzes_router, tags=["Quizzes"])
 api_router.include_router(assignments_router, tags=["Assignments"])
 api_router.include_router(discussions_router, tags=["Discussions"])
+api_router.include_router(direct_discussions_router, tags=["Discussions"])
 api_router.include_router(course_discussions_router, tags=["Discussions"])
 api_router.include_router(reviews_router, prefix="/courses", tags=["reviews"])
 api_router.include_router(enrollments.router, tags=["enrollments"])
